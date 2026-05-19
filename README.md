@@ -1,6 +1,6 @@
-# ClipboardManager
+# ClipFlow
 
-A macOS clipboard history manager built with Electron. Lives in the menu bar as a paperclip icon.
+A macOS clipboard history manager that lives in your menu bar. Automatically captures every copy, lets you compose multiple clips into one, and accumulates text continuously across copies. Export to Markdown in one click. Keep your clipboard flowing, not forgetting.
 
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
 ![Electron](https://img.shields.io/badge/electron-42-blue)
@@ -35,10 +35,10 @@ npm start
 
 ```bash
 # Package for macOS (arm64)
-npx electron-packager . ClipboardManager --platform=darwin --arch=arm64 --overwrite --out=dist
+npx electron-packager . ClipFlow --platform=darwin --arch=arm64 --overwrite --out=dist
 ```
 
-The packaged app will be in `dist/ClipboardManager-darwin-arm64/`.
+The packaged app will be in `dist/ClipFlow-darwin-arm64/`.
 
 ## Usage
 
