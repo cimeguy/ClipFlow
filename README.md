@@ -5,6 +5,12 @@ A macOS clipboard history manager that lives in your menu bar. Automatically cap
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
 ![Electron](https://img.shields.io/badge/electron-42-blue)
 
+## Download
+
+**[→ Latest Release](https://github.com/cimeguy/ClipFlow/releases)**
+
+Download the `.dmg`, open it, and drag ClipFlow.app to your Applications folder.
+
 ## Features
 
 - **Clipboard history** — automatically captures text and images as you copy

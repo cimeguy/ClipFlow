@@ -5,6 +5,12 @@ macOS 剪贴板历史管理工具，常驻菜单栏。自动记录每一次复�
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
 ![Electron](https://img.shields.io/badge/electron-42-blue)
 
+## 下载
+
+**[→ 最新版本下载](https://github.com/cimeguy/ClipFlow/releases)**
+
+下载 `.dmg` 文件，打开后将 ClipFlow.app 拖入应用程序文件夹即可。
+
 ## 功能特性
 
 - **剪贴板历史** — 自动捕获每一次文字和图片复制，持久化保存
