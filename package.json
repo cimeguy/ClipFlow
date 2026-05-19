@@ -1,0 +1,16 @@
+{
+  "name": "clipboardmanager",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@electron/packager": "^20.0.0",
+    "electron": "^42.1.0"
+  }
+}

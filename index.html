@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8"/>
+<title>Clipboard Manager</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+  font-size: 13px; background: #fff; color: #1d1d1f;
+  height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 10px; border: 1px solid rgba(0,0,0,0.15);
+  -webkit-app-region: no-drag;
+}
+
+/* ── Header ── */
+.header { padding: 10px 14px 8px; border-bottom: 1px solid #e5e5e5; flex-shrink: 0; }
+.header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.app-title { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; }
+.mona-icon {
+  width: 24px; height: 24px; border-radius: 50%;
+  object-fit: cover; object-position: center 15%;
+  border: 1.5px solid #ddd; flex-shrink: 0;
+}
+.header-btns { display: flex; gap: 4px; }
+.hbtn {
+  font-size: 11px; color: #888; background: none; border: 1px solid transparent;
+  cursor: pointer; padding: 2px 7px; border-radius: 5px; white-space: nowrap;
+}
+.hbtn:hover { background: #f0f0f0; color: #444; border-color: #e0e0e0; }
+.hbtn.active { background: #007aff; color: #fff; border-color: #007aff; }
+
+/* ── Continuous mode ── */
+.cont-section { background: #f5f5f7; border-radius: 8px; padding: 8px 10px; }
+.cont-row { display: flex; align-items: center; justify-content: space-between; }
+.cont-label { font-size: 12px; font-weight: 500; color: #444; }
+.toggle { position: relative; width: 34px; height: 20px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; inset: 0; background: #ccc; border-radius: 20px; cursor: pointer; transition: background .2s; }
+.slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px; background: #fff; border-radius: 50%; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+input:checked + .slider { background: #34c759; }
+input:checked + .slider::before { transform: translateX(14px); }
+.cont-buffer { margin-top: 6px; font-size: 11px; color: #666; line-height: 1.45; max-height: 52px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.cont-buffer.placeholder { color: #aaa; font-style: italic; }
+
+/* ── List ── */
+.list { flex: 1; overflow-y: auto; padding: 4px 0; }
+.list::-webkit-scrollbar { width: 5px; }
+.list::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+.empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #bbb; font-size: 12px; }
+
+.item {
+  display: flex; align-items: flex-start; gap: 6px;
+  padding: 7px 10px 7px 8px; cursor: pointer; border-radius: 6px;
+  margin: 1px 4px; transition: background .1s; position: relative;
+}
+.item:hover { background: rgba(0,122,255,.07); }
+.item.selected { background: rgba(0,122,255,.13); }
+
+.eye-btn {
+  flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px;
+  background: none; border: none; cursor: pointer; padding: 0;
+  opacity: 0; color: #888;
+}
+.item:hover .eye-btn, .item.selected .eye-btn { opacity: 1; }
+.eye-btn:hover { color: #007aff; }
+
+.select-check {
+  flex-shrink: 0; width: 16px; height: 16px; margin-top: 2px;
+  accent-color: #007aff; display: none; cursor: pointer;
+}
+.compose-mode .select-check { display: block; }
+.compose-mode .item-icon { display: none; }
+.item.drag-over { border-top: 2px solid #007aff; }
+.item.dragging { opacity: .4; }
+
+.item-icon { flex-shrink: 0; width: 14px; height: 14px; margin-top: 2px; opacity: .3; }
+.item-body { flex: 1; min-width: 0; }
+.item-preview {
+  font-size: 12.5px; line-height: 1.45; color: #1d1d1f;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-all;
+}
+.item-image-preview { max-width: 100%; max-height: 56px; border-radius: 4px; object-fit: contain; }
+.item-time { font-size: 10px; color: #bbb; margin-top: 2px; }
+.item-actions { display: none; gap: 4px; align-items: center; flex-shrink: 0; }
+.item:hover .item-actions, .item.selected .item-actions { display: flex; }
+.compose-mode .item-actions { display: none !important; }
+.action-btn {
+  font-size: 10px; padding: 2px 6px; border-radius: 4px;
+  border: 1px solid #ddd; background: #fff; cursor: pointer; color: #555; white-space: nowrap;
+}
+.action-btn:hover { background: #007aff; color: #fff; border-color: #007aff; }
+.action-btn.bib-btn { color: #7c4dff; border-color: #c5b0ff; }
+.action-btn.bib-btn:hover { background: #7c4dff; border-color: #7c4dff; color: #fff; }
+.action-btn.del-btn { color: #ff3b30; border-color: #ffb3b0; }
+.action-btn.del-btn:hover { background: #ff3b30; border-color: #ff3b30; color: #fff; }
+
+/* ── Compose bar ── */
+.compose-bar {
+  display: none; padding: 8px 12px; border-top: 1px solid #e5e5e5;
+  gap: 6px; align-items: center; flex-shrink: 0; background: #f9f9f9;
+}
+.compose-bar.show { display: flex; }
+.compose-info { flex: 1; font-size: 11px; color: #666; }
+.compose-sep {
+  font-size: 11px; padding: 3px 8px; border-radius: 5px;
+  border: 1px solid #ddd; background: #fff; cursor: pointer; color: #444;
+}
+.compose-copy {
+  font-size: 11px; padding: 3px 10px; border-radius: 5px;
+  border: none; background: #007aff; color: #fff; cursor: pointer;
+}
+.compose-copy:disabled { opacity: .4; cursor: default; }
+
+/* ── Settings panel ── */
+.settings-panel {
+  display: none; padding: 12px 14px; flex-direction: column; gap: 12px;
+  border-top: 1px solid #e5e5e5; flex-shrink: 0; background: #fafafa;
+}
+.settings-panel.show { display: flex; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.setting-label { font-size: 12px; color: #555; }
+.setting-input {
+  width: 64px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 5px;
+  font-size: 12px; text-align: center; outline: none;
+}
+.setting-input:focus { border-color: #007aff; }
+.settings-save {
+  align-self: flex-end; font-size: 12px; padding: 4px 14px;
+  border-radius: 5px; border: none; background: #007aff; color: #fff; cursor: pointer;
+}
+
+/* ── Preview modal ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.45); z-index: 200;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: #fff; border-radius: 10px; padding: 14px;
+  width: 340px; max-height: 400px; display: flex; flex-direction: column; gap: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.2);
+}
+.modal-title { font-size: 13px; font-weight: 600; }
+.modal-status { font-size: 11px; color: #888; }
+.modal-status.error { color: #ff3b30; }
+.preview-text {
+  flex: 1; font-size: 12px; line-height: 1.6; color: #1d1d1f;
+  overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+  background: #f5f5f7; border-radius: 6px; padding: 8px;
+  max-height: 240px;
+}
+.preview-img { max-width: 100%; max-height: 240px; border-radius: 6px; object-fit: contain; }
+.bib-textarea {
+  flex: 1; font-family: 'SF Mono', Monaco, monospace; font-size: 11px;
+  line-height: 1.5; border: 1px solid #ddd; border-radius: 6px;
+  padding: 8px; resize: none; outline: none; color: #1d1d1f;
+  background: #fafafa; min-height: 160px;
+}
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-btn { font-size: 12px; padding: 5px 12px; border-radius: 6px; border: 1px solid #ddd; cursor: pointer; background: #f5f5f7; }
+.modal-btn.primary { background: #007aff; color: #fff; border-color: #007aff; }
+.modal-btn.purple { background: #7c4dff; color: #fff; border-color: #7c4dff; }
+.modal-btn:hover { opacity: .85; }
+.candidate-item {
+  padding: 7px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid #e5e5e5; background: #fafafa;
+  transition: background .1s;
+}
+.candidate-item:hover { background: rgba(0,122,255,.08); border-color: #007aff; }
+.candidate-title { font-size: 12px; font-weight: 500; color: #1d1d1f; line-height: 1.4; }
+.candidate-meta { font-size: 10px; color: #aaa; margin-top: 2px; }
+@media (prefers-color-scheme: dark) {
+  .candidate-item { background: #3a3a3c; border-color: #555; }
+  .candidate-item:hover { background: rgba(0,122,255,.2); }
+  .candidate-title { color: #f2f2f7; }
+}
+
+/* ── Dark mode ── */
+@media (prefers-color-scheme: dark) {
+  body { background: #1c1c1e; color: #f2f2f7; border-color: rgba(255,255,255,.1); }
+  .header { border-bottom-color: #3a3a3c; }
+  .hbtn:hover { background: #2c2c2e; color: #ccc; }
+  .cont-section { background: #2c2c2e; }
+  .cont-label { color: #aeaeb2; }
+  .item:hover { background: rgba(0,122,255,.12); }
+  .item.selected { background: rgba(0,122,255,.2); }
+  .item-preview { color: #f2f2f7; }
+  .action-btn { background: #2c2c2e; border-color: #444; color: #aaa; }
+  .compose-bar { background: #2c2c2e; border-top-color: #3a3a3c; }
+  .compose-sep { background: #3a3a3c; border-color: #555; color: #ddd; }
+  .settings-panel { background: #1c1c1e; border-top-color: #3a3a3c; }
+  .setting-label { color: #aaa; }
+  .setting-input { background: #2c2c2e; border-color: #555; color: #f2f2f7; }
+  .modal { background: #2c2c2e; }
+  .modal-title { color: #f2f2f7; }
+  .preview-text { background: #1c1c1e; color: #f2f2f7; }
+  .bib-textarea { background: #1c1c1e; border-color: #444; color: #f2f2f7; }
+  .modal-btn { background: #3a3a3c; border-color: #555; color: #eee; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-row">
+    <span class="app-title">
+      <img class="mona-icon" id="monaIcon" src="" alt=""/>
+      剪贴板历史
+    </span>
+    <div class="header-btns">
+      <button class="hbtn" id="composeBtn">多选</button>
+      <button class="hbtn" id="settingsBtn">设置</button>
+      <button class="hbtn" id="clearBtn">清空</button>
+    </div>
+  </div>
+  <div class="cont-section">
+    <div class="cont-row">
+      <span class="cont-label">连续复制模式</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button id="flushBtn" style="display:none;font-size:11px;padding:2px 10px;border-radius:5px;border:none;background:#34c759;color:#fff;cursor:pointer;">完成→存入历史</button>
+        <label class="toggle"><input type="checkbox" id="contToggle"/><span class="slider"></span></label>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:6px;margin-top:6px;">
+      <div class="cont-buffer placeholder" id="contBuffer" style="flex:1;margin-top:0;">开启后，多次复制的文本将自动拼接</div>
+      <button id="bufferPreviewBtn" style="display:none;flex-shrink:0;background:none;border:none;cursor:pointer;opacity:.5;padding:1px;" title="预览全文">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/><path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- History list -->
+<div class="list" id="list">
+  <div class="empty">暂无剪贴板记录</div>
+</div>
+
+<!-- Compose bar -->
+<div class="compose-bar" id="composeBar">
+  <span class="compose-info" id="composeInfo">选择条目后拼接</span>
+  <select class="compose-sep" id="composeSep">
+    <option value="\n">换行</option>
+    <option value=" ">空格</option>
+    <option value="">直接拼</option>
+    <option value="\n\n">空行</option>
+  </select>
+  <select class="compose-sep" id="composeDir">
+    <option value="asc">从上↓</option>
+    <option value="desc">从下↑</option>
+  </select>
+  <button class="compose-copy" id="composeCopy" disabled>拼接</button>
+  <button class="compose-copy" id="composeMd" disabled style="background:#7c4dff;">导出 .md</button>
+</div>
+
+<!-- Settings panel -->
+<div class="settings-panel" id="settingsPanel">
+  <div class="setting-row">
+    <span class="setting-label">最多保存文本条数</span>
+    <input class="setting-input" type="number" id="maxText" min="1" max="500" value="50"/>
+  </div>
+  <div class="setting-row">
+    <span class="setting-label">最多保存图片条数</span>
+    <input class="setting-input" type="number" id="maxImage" min="1" max="100" value="20"/>
+  </div>
+  <div style="border-top:1px solid #e5e5e5;margin:4px 0;padding-top:10px;">
+    <div style="font-size:12px;font-weight:600;color:#444;margin-bottom:8px;">Markdown 导出配置</div>
+    <div style="font-size:10px;color:#aaa;margin-bottom:8px;">在「拼接」模式完成后，可将结果导出为 .md 文件</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="setting-row">
+        <span class="setting-label">导出模式</span>
+        <select id="mdExportMode" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:5px;background:#fff;">
+          <option value="append">附加（追加到已有文件末尾）</option>
+          <option value="overwrite">新建（每次新建或覆盖文件）</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">默认文件名</span>
+        <input class="setting-input" type="text" id="mdFilename" value="clipboard-export.md" style="width:150px;text-align:left;font-size:11px;"/>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="setting-label" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;" id="mdPathLabel">未设置默认目录（每次手动选择）</span>
+        <button class="hbtn" id="pickDirBtn" style="white-space:nowrap;">设置目录</button>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <button id="quitBtn" style="font-size:12px;padding:4px 14px;border-radius:5px;border:1px solid #ffb3b0;background:#fff5f5;color:#ff3b30;cursor:pointer;">退出应用</button>
+    <button class="settings-save" id="settingsSave">保存设置</button>
+  </div>
+</div>
+
+<!-- Preview / BibTeX modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">预览</div>
+    <div class="modal-status" id="modalStatus"></div>
+    <div class="preview-text" id="previewText" style="display:none"></div>
+    <img class="preview-img" id="previewImg" style="display:none"/>
+    <!-- candidate list for title search -->
+    <div id="candidateList" style="display:none;flex-direction:column;gap:4px;overflow-y:auto;max-height:220px;"></div>
+    <textarea class="bib-textarea" id="bibTextarea" style="display:none" spellcheck="false"></textarea>
+    <div class="modal-actions">
+      <button class="modal-btn" id="modalClose">关闭</button>
+      <button class="modal-btn" id="modalBack" style="display:none">← 重选</button>
+      <button class="modal-btn primary" id="modalCopy">复制</button>
+      <button class="modal-btn purple" id="modalSave" style="display:none">导出 .bib</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let currentHistory = []
+let composeMode = false
+let selectedIndices = new Set()
+
+const listEl       = document.getElementById('list')
+const contToggle   = document.getElementById('contToggle')
+const contBuffer   = document.getElementById('contBuffer')
+const clearBtn     = document.getElementById('clearBtn')
+const composeBtn   = document.getElementById('composeBtn')
+const settingsBtn  = document.getElementById('settingsBtn')
+const composeBar   = document.getElementById('composeBar')
+const composeInfo  = document.getElementById('composeInfo')
+const composeSep   = document.getElementById('composeSep')
+const composeDir   = document.getElementById('composeDir')
+const flushBtn          = document.getElementById('flushBtn')
+const bufferPreviewBtn  = document.getElementById('bufferPreviewBtn')
+const composeCopy  = document.getElementById('composeCopy')
+const composeMd    = document.getElementById('composeMd')
+const settingsPanel= document.getElementById('settingsPanel')
+const settingsSave = document.getElementById('settingsSave')
+const maxTextInput = document.getElementById('maxText')
+const maxImageInput= document.getElementById('maxImage')
+const modalOverlay = document.getElementById('modalOverlay')
+const modalTitle   = document.getElementById('modalTitle')
+const modalStatus  = document.getElementById('modalStatus')
+const previewText  = document.getElementById('previewText')
+const previewImg   = document.getElementById('previewImg')
+const bibTextarea  = document.getElementById('bibTextarea')
+const modalClose     = document.getElementById('modalClose')
+const modalBack      = document.getElementById('modalBack')
+const modalCopy      = document.getElementById('modalCopy')
+const modalSave      = document.getElementById('modalSave')
+const candidateList  = document.getElementById('candidateList')
+const monaIcon     = document.getElementById('monaIcon')
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+const ICON_TEXT = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h1V2zm1 1v1h4V3H6zM4 5a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H4z"/></svg>`
+const ICON_IMG  = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/><path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2h-13zm13 1a.5.5 0 0 1 .5.5v6l-3.775-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12v.54A.505.505 0 0 1 1 12.5v-9a.5.5 0 0 1 .5-.5h13z"/></svg>`
+const ICON_EYE  = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/><path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>`
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function relativeTime(ts) {
+  const s = (Date.now() - ts) / 1000
+  if (s < 60) return '刚刚'
+  if (s < 3600) return Math.floor(s/60) + ' 分钟前'
+  if (s < 86400) return Math.floor(s/3600) + ' 小时前'
+  return Math.floor(s/86400) + ' 天前'
+}
+
+function isLikelyPaper(text) {
+  if (!text || text.length < 8 || text.length > 600) return false
+  if (/arxiv\.org/i.test(text)) return true
+  if (/\b\d{4}\.\d{4,5}\b/.test(text)) return true
+  if (/\b10\.\d{4,}\/\S+/.test(text)) return true
+  if (/^https?:\/\/\S+$/.test(text.trim())) return false
+  const words = text.trim().split(/\s+/)
+  if (words.length < 5 || words.length > 40) return false
+  if (/[{}();=<>|&$]/.test(text)) return false
+  return true
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderHistory(items) {
+  currentHistory = items || []
+  if (!currentHistory.length) {
+    listEl.innerHTML = '<div class="empty">暂无剪贴板记录</div>'
+    return
+  }
+  listEl.className = 'list' + (composeMode ? ' compose-mode' : '')
+  listEl.innerHTML = currentHistory.map((item, i) => {
+    const time = relativeTime(item.ts)
+    const checked = selectedIndices.has(i) ? 'checked' : ''
+    const selClass = selectedIndices.has(i) ? ' selected' : ''
+    const eyeBtn = `<button class="eye-btn" data-i="${i}" title="预览全文">${ICON_EYE}</button>`
+    const check = `<input class="select-check" type="checkbox" data-i="${i}" ${checked}/>`
+
+    if (item.type === 'image') {
+      return `<div class="item${selClass}" data-index="${i}">
+        ${eyeBtn}${check}
+        <span class="item-icon">${ICON_IMG}</span>
+        <div class="item-body">
+          <img class="item-image-preview" src="${item.value}"/>
+          <div class="item-time">${time}</div>
+        </div>
+        <div class="item-actions">
+          <button class="action-btn copy-btn" data-i="${i}">复制</button>
+          <button class="action-btn del-btn" data-ts="${item.ts}">✕</button>
+        </div>
+      </div>`
+    }
+    const esc = item.value.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    const bibBtn = isLikelyPaper(item.value)
+      ? `<button class="action-btn bib-btn" data-i="${i}">BibTeX</button>` : ''
+    return `<div class="item${selClass}" data-index="${i}">
+      ${eyeBtn}${check}
+      <span class="item-icon">${ICON_TEXT}</span>
+      <div class="item-body">
+        <div class="item-preview">${esc}</div>
+        <div class="item-time">${time}</div>
+      </div>
+      <div class="item-actions">
+        <button class="action-btn copy-btn" data-i="${i}">复制</button>
+        ${bibBtn}
+        <button class="action-btn del-btn" data-ts="${item.ts}">✕</button>
+      </div>
+    </div>`
+  }).join('')
+
+    // drag-and-drop reorder
+  let dragSrcIdx = null
+  listEl.querySelectorAll('.item').forEach(el => {
+    el.draggable = true
+    el.addEventListener('dragstart', e => {
+      dragSrcIdx = parseInt(el.dataset.index)
+      el.classList.add('dragging')
+      e.dataTransfer.effectAllowed = 'move'
+    })
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging')
+      listEl.querySelectorAll('.item').forEach(x => x.classList.remove('drag-over'))
+    })
+    el.addEventListener('dragover', e => {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      listEl.querySelectorAll('.item').forEach(x => x.classList.remove('drag-over'))
+      el.classList.add('drag-over')
+    })
+    el.addEventListener('drop', e => {
+      e.preventDefault()
+      const destIdx = parseInt(el.dataset.index)
+      if (dragSrcIdx === null || dragSrcIdx === destIdx) return
+      const arr = [...currentHistory]
+      const [moved] = arr.splice(dragSrcIdx, 1)
+      arr.splice(destIdx, 0, moved)
+      currentHistory = arr
+      window.api.reorderHistory(arr)
+      renderHistory(arr)
+      dragSrcIdx = null
+    })
+  })
+
+  // click = select in compose mode; dblclick = copy in normal mode
+  listEl.querySelectorAll('.item').forEach(el => {
+    el.addEventListener('click', e => {
+      if (e.target.closest('.eye-btn') || e.target.closest('.item-actions') || e.target.closest('.select-check')) return
+      if (composeMode) toggleSelect(parseInt(el.dataset.index))
+    })
+    el.addEventListener('dblclick', e => {
+      if (e.target.closest('.eye-btn') || e.target.closest('.item-actions') || e.target.closest('.select-check')) return
+      if (!composeMode) window.api.recopy(currentHistory[parseInt(el.dataset.index)])
+    })
+  })
+  listEl.querySelectorAll('.eye-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openPreview(currentHistory[parseInt(btn.dataset.i)]) })
+  })
+  listEl.querySelectorAll('.select-check').forEach(cb => {
+    cb.addEventListener('change', () => { toggleSelect(parseInt(cb.dataset.i)); })
+  })
+  listEl.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); window.api.recopy(currentHistory[parseInt(btn.dataset.i)]) })
+  })
+  listEl.querySelectorAll('.bib-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openBibModal(currentHistory[parseInt(btn.dataset.i)].value) })
+  })
+  listEl.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); window.api.deleteItem(parseInt(btn.dataset.ts)) })
+  })
+}
+
+// ── Compose mode ──────────────────────────────────────────────────────────────
+function toggleSelect(i) {
+  if (selectedIndices.has(i)) selectedIndices.delete(i)
+  else selectedIndices.add(i)
+  updateComposeBar()
+  renderHistory(currentHistory)
+}
+
+function updateComposeBar() {
+  const n = selectedIndices.size
+  composeCopy.disabled = n < 1
+  composeMd.disabled = n < 1
+  composeInfo.textContent = n ? `已选 ${n} 条，按顺序拼接` : '选择条目后拼接'
+}
+
+composeBtn.addEventListener('click', () => {
+  composeMode = !composeMode
+  composeBtn.classList.toggle('active', composeMode)
+  composeBar.classList.toggle('show', composeMode)
+  if (!composeMode) { selectedIndices.clear(); updateComposeBar() }
+  renderHistory(currentHistory)
+})
+
+function getComposedText() {
+  const sep = composeSep.value.replace(/\\n/g, '\n')
+  let sorted = [...selectedIndices].sort((a,b) => a - b)
+  if (composeDir.value === 'desc') sorted.reverse()
+  return sorted.map(i => currentHistory[i]).filter(x => x && x.type === 'text').map(x => x.value).join(sep)
+}
+
+composeCopy.addEventListener('click', () => {
+  const result = getComposedText()
+  if (!result) return
+  window.api.writeClipboard(result)   // write only, no history entry
+  composeCopy.textContent = '已复制!'
+  setTimeout(() => { composeCopy.textContent = '拼接'; selectedIndices.clear(); updateComposeBar(); renderHistory(currentHistory) }, 1500)
+})
+
+composeMd.addEventListener('click', async () => {
+  let sorted = [...selectedIndices].sort((a,b) => a - b)
+  if (composeDir.value === 'desc') sorted.reverse()
+  const items = sorted.map(i => currentHistory[i]).filter(Boolean)
+  if (!items.length) return
+  const mode = mdExportMode?.value || 'append'
+  const filename = mdFilenameInput?.value.trim() || 'clipboard-export.md'
+  const res = await window.api.saveComposeMd({ items, mode, filename, defaultDir: currentExportPath })
+  if (res?.ok) {
+    composeMd.textContent = '已导出!'
+    setTimeout(() => composeMd.textContent = '导出 .md', 1500)
+  }
+})
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+const mdExportMode    = document.getElementById('mdExportMode')
+const mdFilenameInput = document.getElementById('mdFilename')
+const mdPathLabel     = document.getElementById('mdPathLabel')
+const pickDirBtn      = document.getElementById('pickDirBtn')
+let currentExportPath = ''
+
+pickDirBtn.addEventListener('click', async () => {
+  const dir = await window.api.pickExportDir()
+  if (dir) {
+    currentExportPath = dir
+    mdPathLabel.textContent = dir
+    mdPathLabel.title = dir
+  }
+})
+
+settingsBtn.addEventListener('click', () => {
+  settingsPanel.classList.toggle('show')
+  settingsBtn.classList.toggle('active', settingsPanel.classList.contains('show'))
+})
+
+document.getElementById('quitBtn').addEventListener('click', () => window.api.quitApp())
+
+settingsSave.addEventListener('click', () => {
+  const maxText = parseInt(maxTextInput.value) || 50
+  const maxImage = parseInt(maxImageInput.value) || 20
+  const markdownExportPath = currentExportPath
+  const markdownFilename = mdFilenameInput.value.trim() || 'clipboard-history.md'
+  const markdownExportMode = mdExportMode.value
+  window.api.saveSettings({ maxText, maxImage, markdownExportPath, markdownFilename, markdownExportMode })
+  settingsSave.textContent = '已保存!'
+  setTimeout(() => settingsSave.textContent = '保存设置', 1500)
+})
+
+// ── Eye / Preview modal ───────────────────────────────────────────────────────
+function openPreview(item) {
+  modalTitle.textContent = '预览全文'
+  modalStatus.textContent = ''
+  bibTextarea.style.display = 'none'
+  modalSave.style.display = 'none'
+  if (item.type === 'image') {
+    previewText.style.display = 'none'
+    previewImg.style.display = 'block'
+    previewImg.src = item.value
+    modalCopy.textContent = '复制图片'
+    modalCopy.onclick = () => { window.api.recopy(item); modalCopy.textContent = '已复制!'; setTimeout(() => modalCopy.textContent = '复制图片', 1500) }
+  } else {
+    previewImg.style.display = 'none'
+    previewText.style.display = 'block'
+    previewText.textContent = item.value
+    modalCopy.textContent = '复制'
+    modalCopy.onclick = () => { navigator.clipboard.writeText(item.value); modalCopy.textContent = '已复制!'; setTimeout(() => modalCopy.textContent = '复制', 1500) }
+  }
+  modalOverlay.classList.add('show')
+}
+
+// ── BibTeX modal ──────────────────────────────────────────────────────────────
+let savedCandidates = []
+
+function showBibResult(bib) {
+  candidateList.style.display = 'none'
+  bibTextarea.style.display = 'block'
+  bibTextarea.value = bib
+  modalBack.style.display = savedCandidates.length ? 'inline-block' : 'none'
+  modalSave.style.display = 'inline-block'
+  modalCopy.style.display = 'inline-block'
+  modalStatus.textContent = '生成成功'
+  modalStatus.style.color = ''
+  modalCopy.onclick = () => {
+    navigator.clipboard.writeText(bib)
+    modalCopy.textContent = '已复制!'; setTimeout(() => modalCopy.textContent = '复制', 1500)
+  }
+}
+
+function showCandidates(candidates) {
+  savedCandidates = candidates
+  bibTextarea.style.display = 'none'
+  modalSave.style.display = 'none'
+  modalBack.style.display = 'none'
+  modalCopy.style.display = 'none'
+  modalStatus.textContent = '找到以下文献，请选择正确的一条：'
+  modalStatus.style.color = ''
+  candidateList.style.display = 'flex'
+  candidateList.innerHTML = candidates.map((c, i) => `
+    <div class="candidate-item" data-i="${i}">
+      <div class="candidate-title">${c.title.replace(/</g,'&lt;')}</div>
+      <div class="candidate-meta">${[c.authors, c.year].filter(Boolean).join(' · ')}</div>
+    </div>`).join('')
+  candidateList.querySelectorAll('.candidate-item').forEach(el => {
+    el.addEventListener('click', () => showBibResult(candidates[parseInt(el.dataset.i)].bib))
+  })
+}
+
+function openBibModal(text) {
+  modalTitle.textContent = '生成 BibTeX'
+  modalStatus.textContent = '查询中…'
+  modalStatus.style.color = ''
+  previewText.style.display = 'none'
+  previewImg.style.display = 'none'
+  bibTextarea.style.display = 'none'
+  candidateList.style.display = 'none'
+  bibTextarea.value = ''
+  savedCandidates = []
+  modalBack.style.display = 'none'
+  modalSave.style.display = 'none'
+  modalCopy.style.display = 'inline-block'
+  modalCopy.textContent = '复制'
+  modalOverlay.classList.add('show')
+
+  window.api.fetchBibtex(text).then(res => {
+    if (!res.ok) {
+      modalStatus.textContent = res.error || '查询失败'
+      modalStatus.className = 'modal-status error'
+      return
+    }
+    if (res.needsPick) {
+      showCandidates(res.candidates)
+    } else {
+      showBibResult(res.bib)
+    }
+  })
+}
+
+modalBack.addEventListener('click', () => { if (savedCandidates.length) showCandidates(savedCandidates) })
+
+modalSave.addEventListener('click', async () => {
+  if (!bibTextarea.value) return
+  const res = await window.api.saveBibFile(bibTextarea.value)
+  if (res.ok) { modalSave.textContent = '已保存!'; setTimeout(() => modalSave.textContent = '导出 .bib', 1500) }
+})
+
+modalClose.addEventListener('click', () => modalOverlay.classList.remove('show'))
+modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.classList.remove('show') })
+
+// ── Continuous mode ───────────────────────────────────────────────────────────
+let currentBuffer = ''
+
+function updateBufferDisplay(buf) {
+  currentBuffer = buf || ''
+  if (!buf) {
+    contBuffer.textContent = '开启后，多次复制的文本将自动拼接'
+    contBuffer.classList.add('placeholder')
+    flushBtn.style.display = 'none'
+    bufferPreviewBtn.style.display = 'none'
+  } else {
+    contBuffer.textContent = buf
+    contBuffer.classList.remove('placeholder')
+    const on = contToggle.checked
+    flushBtn.style.display = on ? 'inline-block' : 'none'
+    bufferPreviewBtn.style.display = 'inline-block'
+  }
+}
+
+bufferPreviewBtn.addEventListener('click', () => {
+  if (!currentBuffer) return
+  openPreview({ type: 'text', value: currentBuffer, ts: Date.now() })
+})
+
+flushBtn.addEventListener('click', () => {
+  window.api.flushContinuousBuffer()
+  flushBtn.textContent = '已保存!'
+  setTimeout(() => { flushBtn.textContent = '完成→存入历史' }, 1200)
+})
+contToggle.addEventListener('change', () => { window.api.setContinuousMode(contToggle.checked); if (!contToggle.checked) updateBufferDisplay('') })
+clearBtn.addEventListener('click', () => { if (confirm('确认清空所有历史记录？')) window.api.clearHistory() })
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+;(async () => {
+  const [items, contState, settings] = await Promise.all([
+    window.api.getHistory(),
+    window.api.getContinuousState(),
+    window.api.getSettings()
+  ])
+  renderHistory(items)
+  contToggle.checked = contState.enabled
+  updateBufferDisplay(contState.buffer)
+  maxTextInput.value = settings.maxText
+  maxImageInput.value = settings.maxImage
+  if (settings.markdownExportPath) {
+    currentExportPath = settings.markdownExportPath
+    mdPathLabel.textContent = settings.markdownExportPath
+    mdPathLabel.title = settings.markdownExportPath
+  }
+  if (settings.markdownFilename) mdFilenameInput.value = settings.markdownFilename
+  if (settings.markdownExportMode) mdExportMode.value = settings.markdownExportMode
+
+  // Draw paperclip tray icon
+  // Render Feather-style paperclip SVG onto canvas for crisp icon
+  const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`
+  const blob = new Blob([svgStr], { type: 'image/svg+xml' })
+  const svgUrl = URL.createObjectURL(blob)
+  const svgImg = new Image()
+  svgImg.onload = () => {
+    const ic = document.createElement('canvas')
+    ic.width = 18; ic.height = 18
+    const ctx = ic.getContext('2d')
+    ctx.drawImage(svgImg, 0, 0, 18, 18)
+    URL.revokeObjectURL(svgUrl)
+    window.api.setTrayIcon(ic.toDataURL('image/png'))
+  }
+  svgImg.src = svgUrl
+
+  monaIcon.src = 'tray-icon.png'
+})()
+
+window.api.onHistoryUpdate(items => { renderHistory(items) })
+window.api.onContinuousBuffer(updateBufferDisplay)
+setInterval(async () => { renderHistory(await window.api.getHistory()) }, 30000)
+</script>
+</body>
+</html>
