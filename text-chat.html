@@ -117,22 +117,82 @@ body {
   align-self: flex-start;
   border-bottom-left-radius: 4px;
 }
+.chat-msg.ai p { margin: 0 0 6px; }
+.chat-msg.ai p:last-child { margin-bottom: 0; }
+.chat-msg.ai code { background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+.chat-msg.ai pre { background: rgba(0,0,0,0.05); padding: 8px 10px; border-radius: 6px; overflow-x: auto; margin: 6px 0; }
+.chat-msg.ai pre code { background: none; padding: 0; }
+.chat-msg.ai ul, .chat-msg.ai ol { padding-left: 18px; margin: 4px 0; }
+.chat-msg.ai h1, .chat-msg.ai h2, .chat-msg.ai h3 { font-size: 12px; margin: 8px 0 4px; }
+.chat-msg.ai table { border-collapse: collapse; margin: 6px 0; font-size: 11px; }
+.chat-msg.ai th, .chat-msg.ai td { border: 1px solid #ddd; padding: 4px 8px; }
+.chat-msg.ai th { background: #f5f5f5; }
 .chat-msg.error { background: #fff0f0; color: #ff3b30; align-self: flex-start; }
 .chat-input-row {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
   margin-top: 10px;
+  flex-direction: column;
+}
+.quick-questions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-bottom: 4px;
+}
+.quick-q {
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid #e5e5ea;
+  background: #f8f8fa;
+  font-size: 10.5px;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.quick-q:hover { background: #eef0f5; border-color: #007aff; color: #007aff; }
+.quick-q.clear-q { border-color: #ffcdd2; color: #e53935; }
+.quick-q.clear-q:hover { background: #fff0f0; border-color: #e53935; }
+.input-resize-handle {
+  width: 40px;
+  height: 8px;
+  margin: 0 auto 2px;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.input-resize-handle::after {
+  content: '';
+  width: 28px;
+  height: 3px;
+  border-radius: 2px;
+  background: #ddd;
+  transition: background 0.2s;
+}
+.input-resize-handle:hover::after { background: #aaa; }
+.input-row-inner {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
 }
 .chat-input {
   flex: 1;
   padding: 8px 12px;
-  border-radius: 20px;
+  border-radius: 16px;
   border: 1px solid #e5e5ea;
   background: #f8f8fa;
   color: #1d1d1f;
   font-size: 12px;
+  font-family: inherit;
   outline: none;
+  resize: none;
+  min-height: 34px;
+  max-height: 200px;
+  line-height: 1.4;
+  overflow-y: auto;
 }
 .chat-input:focus { border-color: #007aff; background: #fff; }
 .chat-send {
@@ -271,9 +331,21 @@ body {
       <div class="context-block" id="contextBlock"></div>
       <div class="chat-area">
         <div class="chat-history" id="chatHistory"></div>
-        <div class="chat-input-row">
-          <input class="chat-input" id="chatInput" placeholder="基于文本内容提问..."/>
-          <button class="chat-send" id="chatSend">发送</button>
+        <div class="chat-input-row" id="chatInputRow">
+          <div class="quick-questions" id="quickQuestions">
+            <span class="quick-q">翻译成中文</span>
+            <span class="quick-q">翻译成英文</span>
+            <span class="quick-q">总结要点</span>
+            <span class="quick-q">解释含义</span>
+            <span class="quick-q">润色改写</span>
+            <span class="quick-q">提取关键词</span>
+            <span class="quick-q clear-q">清空</span>
+          </div>
+          <div class="input-resize-handle" id="inputResizeHandle"></div>
+          <div class="input-row-inner">
+            <textarea class="chat-input" id="chatInput" placeholder="基于文本内容提问..." rows="1"></textarea>
+            <button class="chat-send" id="chatSend">发送</button>
+          </div>
         </div>
       </div>
     </div>
@@ -284,6 +356,7 @@ body {
     </div>
   </div>
 </div>
+<script src="node_modules/marked/lib/marked.umd.js"></script>
 <script>
 let contextText = ''
 let itemTs = null
@@ -301,7 +374,11 @@ try {
       chatMessages.forEach(msg => {
         const el = document.createElement('div')
         el.className = 'chat-msg ' + msg.role
-        el.textContent = msg.text
+        if (msg.role === 'ai') {
+          el.innerHTML = marked.parse(msg.text)
+        } else {
+          el.textContent = msg.text
+        }
         document.getElementById('chatHistory').appendChild(el)
       })
     }
@@ -330,6 +407,7 @@ function sendQuestion() {
   userMsg.textContent = q
   chatHistory.appendChild(userMsg)
   chatInput.value = ''
+  chatInput.style.height = '34px'
   chatSend.disabled = true
   chatSend.textContent = '停止'
   chatMessages.push({ role: 'user', text: q })
@@ -338,14 +416,16 @@ function sendQuestion() {
   aiMsg.className = 'chat-msg ai'
   chatHistory.appendChild(aiMsg)
   chatHistory.scrollTop = chatHistory.scrollHeight
+  let aiRawText = ''
 
   window.api.removeAiAskListeners()
   window.api.onAiAskChunk(text => {
-    aiMsg.textContent += text
+    aiRawText += text
+    aiMsg.innerHTML = marked.parse(aiRawText)
     chatHistory.scrollTop = chatHistory.scrollHeight
   })
   window.api.onAiAskDone(() => {
-    chatMessages.push({ role: 'ai', text: aiMsg.textContent })
+    chatMessages.push({ role: 'ai', text: aiRawText })
     if (itemTs) window.api.saveChatHistory(itemTs, chatMessages)
     chatSend.disabled = false
     chatSend.textContent = '发送'
@@ -370,7 +450,55 @@ function sendQuestion() {
   }
 }
 chatSend.onclick = sendQuestion
-chatInput.onkeydown = (e) => { if (e.key === 'Enter' && !chatSend.disabled) sendQuestion() }
+chatInput.onkeydown = (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !chatSend.disabled) {
+    e.preventDefault()
+    sendQuestion()
+  }
+}
+chatInput.oninput = () => {
+  chatInput.style.height = 'auto'
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + 'px'
+}
+
+document.querySelectorAll('.quick-q').forEach(btn => {
+  btn.onclick = () => {
+    if (btn.classList.contains('clear-q')) {
+      chatHistory.innerHTML = ''
+      chatMessages = []
+      if (itemTs) window.api.saveChatHistory(itemTs, chatMessages)
+      return
+    }
+    chatInput.value = btn.textContent
+    sendQuestion()
+  }
+})
+
+;(function() {
+  const handle = document.getElementById('inputResizeHandle')
+  const input = document.getElementById('chatInput')
+  let startY, startH
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault()
+    startY = e.clientY
+    startH = input.offsetHeight
+    document.body.style.cursor = 'ns-resize'
+    document.body.style.userSelect = 'none'
+    const onMove = ev => {
+      const diff = startY - ev.clientY
+      const newH = Math.min(200, Math.max(34, startH + diff))
+      input.style.height = newH + 'px'
+    }
+    const onUp = () => {
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  })
+})()
 chatInput.focus()
 
 async function loadSidebar() {
