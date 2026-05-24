@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8"/>
+<title>AI 问询</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  font-size: 13px;
+  background: #fafafa;
+  color: #1d1d1f;
+  border-radius: 12px;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.titlebar {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 10px;
+  background: #ffffff;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+.titlebar-title { font-size: 13px; font-weight: 600; color: #1d1d1f; }
+.titlebar-btns {
+  -webkit-app-region: no-drag;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.win-btn {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 8px;
+  line-height: 12px;
+  text-align: center;
+  color: transparent;
+  font-weight: bold;
+}
+.win-btn:hover { color: rgba(0,0,0,0.5); }
+.win-btn.minimize { background: #ffbd2e; }
+.win-btn.close { background: #ff5f57; }
+.pin-btn {
+  background: none;
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.4;
+  transition: all 0.15s;
+}
+.pin-btn:hover { opacity: 0.7; }
+.pin-btn.active { opacity: 1; transform: rotate(45deg); }
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.context-block {
+  flex-shrink: 0;
+  max-height: 100px;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #555;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+  min-height: 0;
+}
+.chat-history {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 2px;
+}
+.chat-msg {
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+  max-width: 88%;
+}
+.chat-msg.user {
+  background: #007aff;
+  color: #fff;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+.chat-msg.ai {
+  background: #f0f0f5;
+  color: #1d1d1f;
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+.chat-msg.error { background: #fff0f0; color: #ff3b30; align-self: flex-start; }
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-top: 10px;
+}
+.chat-input {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 1px solid #e5e5ea;
+  background: #f8f8fa;
+  color: #1d1d1f;
+  font-size: 12px;
+  outline: none;
+}
+.chat-input:focus { border-color: #007aff; background: #fff; }
+.chat-send {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: none;
+  background: #7c4dff;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.chat-send:hover { background: #6a3de8; }
+.chat-send:disabled { background: #e5e5ea; color: #86868b; cursor: default; }
+.main-layout {
+  flex: 1;
+  display: flex;
+  gap: 0;
+  min-height: 0;
+}
+.main-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  min-width: 0;
+  padding: 14px;
+}
+.resize-handle {
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+  transition: background 0.2s;
+}
+.resize-handle:hover, .resize-handle.active {
+  background: rgba(0,122,255,0.15);
+}
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 32px;
+  border-radius: 2px;
+  background: rgba(0,0,0,0.1);
+  transition: background 0.2s;
+}
+.resize-handle:hover::after, .resize-handle.active::after {
+  background: rgba(0,122,255,0.4);
+}
+.history-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #f0f0f0;
+  background: #fcfcfd;
+  min-width: 120px;
+  max-width: 400px;
+}
+.sidebar-header {
+  font-size: 10px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 12px 8px;
+  flex-shrink: 0;
+}
+.sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+}
+.sidebar-list::-webkit-scrollbar { width: 3px; }
+.sidebar-list::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+.sidebar-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #444;
+  cursor: pointer;
+  margin-bottom: 4px;
+  transition: background 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+}
+.sidebar-item:hover { background: #eef0f5; }
+.sidebar-item.is-image {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sidebar-item.is-image img {
+  height: 32px;
+  width: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.sidebar-item .copied-tip {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9px;
+  color: #34c759;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.sidebar-item .copied-tip.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="titlebar">
+  <span class="titlebar-title">AI 问询</span>
+  <div class="titlebar-btns">
+    <button class="pin-btn" id="pinBtn">📌</button>
+    <button class="win-btn minimize" id="minimizeBtn">−</button>
+    <button class="win-btn close" id="closeBtn">✕</button>
+  </div>
+</div>
+<div class="content">
+  <div class="main-layout">
+    <div class="main-left">
+      <div class="context-block" id="contextBlock"></div>
+      <div class="chat-area">
+        <div class="chat-history" id="chatHistory"></div>
+        <div class="chat-input-row">
+          <input class="chat-input" id="chatInput" placeholder="基于文本内容提问..."/>
+          <button class="chat-send" id="chatSend">发送</button>
+        </div>
+      </div>
+    </div>
+    <div class="resize-handle" id="resizeHandle"></div>
+    <div class="history-sidebar" id="historySidebar">
+      <div class="sidebar-header">剪贴板历史</div>
+      <div class="sidebar-list" id="sidebarList"></div>
+    </div>
+  </div>
+</div>
+<script>
+let contextText = ''
+let itemTs = null
+let chatMessages = []
+
+try {
+  const hash = location.hash.slice(1)
+  if (hash) {
+    const data = JSON.parse(decodeURIComponent(hash))
+    contextText = data.text || ''
+    itemTs = data.ts || null
+    chatMessages = data.chatHistory || []
+    document.getElementById('contextBlock').textContent = contextText.length > 300 ? contextText.slice(0, 300) + '...' : contextText
+    if (chatMessages.length) {
+      chatMessages.forEach(msg => {
+        const el = document.createElement('div')
+        el.className = 'chat-msg ' + msg.role
+        el.textContent = msg.text
+        document.getElementById('chatHistory').appendChild(el)
+      })
+    }
+  }
+} catch {}
+
+document.getElementById('closeBtn').onclick = () => window.close()
+document.getElementById('minimizeBtn').onclick = () => window.api.minimizeWindow()
+
+let pinned = false
+document.getElementById('pinBtn').onclick = () => {
+  pinned = !pinned
+  document.getElementById('pinBtn').classList.toggle('active', pinned)
+  window.api.setAlwaysOnTop(pinned)
+}
+
+const chatHistory = document.getElementById('chatHistory')
+const chatInput = document.getElementById('chatInput')
+const chatSend = document.getElementById('chatSend')
+
+function sendQuestion() {
+  const q = chatInput.value.trim()
+  if (!q) return
+  const userMsg = document.createElement('div')
+  userMsg.className = 'chat-msg user'
+  userMsg.textContent = q
+  chatHistory.appendChild(userMsg)
+  chatInput.value = ''
+  chatSend.disabled = true
+  chatSend.textContent = '停止'
+  chatMessages.push({ role: 'user', text: q })
+
+  const aiMsg = document.createElement('div')
+  aiMsg.className = 'chat-msg ai'
+  chatHistory.appendChild(aiMsg)
+  chatHistory.scrollTop = chatHistory.scrollHeight
+
+  window.api.removeAiAskListeners()
+  window.api.onAiAskChunk(text => {
+    aiMsg.textContent += text
+    chatHistory.scrollTop = chatHistory.scrollHeight
+  })
+  window.api.onAiAskDone(() => {
+    chatMessages.push({ role: 'ai', text: aiMsg.textContent })
+    if (itemTs) window.api.saveChatHistory(itemTs, chatMessages)
+    chatSend.disabled = false
+    chatSend.textContent = '发送'
+    chatSend.onclick = sendQuestion
+    window.api.removeAiAskListeners()
+  })
+  window.api.onAiAskError(msg => {
+    aiMsg.className = 'chat-msg error'
+    aiMsg.textContent = msg
+    chatSend.disabled = false
+    chatSend.textContent = '发送'
+    chatSend.onclick = sendQuestion
+    window.api.removeAiAskListeners()
+  })
+  window.api.aiTextStream(contextText, q)
+  chatSend.onclick = () => {
+    window.api.aiAskAbort()
+    window.api.removeAiAskListeners()
+    chatSend.disabled = false
+    chatSend.textContent = '发送'
+    chatSend.onclick = sendQuestion
+  }
+}
+chatSend.onclick = sendQuestion
+chatInput.onkeydown = (e) => { if (e.key === 'Enter' && !chatSend.disabled) sendQuestion() }
+chatInput.focus()
+
+async function loadSidebar() {
+  const history = await window.api.getHistory()
+  const list = document.getElementById('sidebarList')
+  list.innerHTML = ''
+  history.forEach(item => {
+    const el = document.createElement('div')
+    el.className = 'sidebar-item' + (item.type === 'image' ? ' is-image' : '')
+    if (item.type === 'image') {
+      const img = document.createElement('img')
+      img.src = item.value
+      el.appendChild(img)
+      const span = document.createElement('span')
+      span.textContent = item.ocrText || '图片'
+      el.appendChild(span)
+    } else {
+      el.textContent = item.value
+    }
+    const tip = document.createElement('span')
+    tip.className = 'copied-tip'
+    tip.textContent = '已复制'
+    el.appendChild(tip)
+    el.onmouseenter = (e) => {
+      let html = ''
+      if (item.type === 'image') {
+        html = `<img src="${item.value}"/>`
+      } else {
+        const escaped = item.value.slice(0, 500).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        html = `<div class="preview-text">${escaped}</div>`
+      }
+      const rect = el.getBoundingClientRect()
+      const winW = window.innerWidth
+      const popW = 280
+      const popH = 200
+      let top = rect.top + rect.height / 2 - popH / 2
+      top = Math.max(10, Math.min(top, window.innerHeight - popH - 10))
+      window.api.showPreviewPopup({ html, x: winW + 6, y: Math.round(top), width: popW, height: popH })
+    }
+    el.onmouseleave = () => {
+      window.api.hidePreviewPopup()
+    }
+    el.onclick = () => {
+      const copyText = item.type === 'image' ? (item.ocrText || '') : item.value
+      if (!copyText) return
+      navigator.clipboard.writeText(copyText)
+      tip.classList.add('show')
+      setTimeout(() => tip.classList.remove('show'), 1200)
+    }
+    list.appendChild(el)
+  })
+}
+loadSidebar()
+window.api.onHistoryUpdate(loadSidebar)
+
+;(function() {
+  const handle = document.getElementById('resizeHandle')
+  const sidebar = document.getElementById('historySidebar')
+  let startX, startW
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault()
+    startX = e.clientX
+    startW = sidebar.offsetWidth
+    handle.classList.add('active')
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    const onMove = ev => {
+      const diff = startX - ev.clientX
+      const newW = Math.min(400, Math.max(120, startW + diff))
+      sidebar.style.width = newW + 'px'
+    }
+    const onUp = () => {
+      handle.classList.remove('active')
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  })
+})()
+</script>
+</body>
+</html>

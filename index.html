@@ -139,7 +139,7 @@ input:checked + .slider::before { transform: translateX(14px); }
 .modal-overlay.show { display: flex; }
 .modal {
   background: #fff; border-radius: 10px; padding: 14px;
-  width: 340px; max-height: 400px; display: flex; flex-direction: column; gap: 10px;
+  width: calc(100vw - 24px); max-height: calc(100vh - 24px); display: flex; flex-direction: column; gap: 10px;
   box-shadow: 0 8px 32px rgba(0,0,0,.2);
 }
 .modal-title { font-size: 13px; font-weight: 600; }
@@ -149,9 +149,9 @@ input:checked + .slider::before { transform: translateX(14px); }
   flex: 1; font-size: 12px; line-height: 1.6; color: #1d1d1f;
   overflow-y: auto; white-space: pre-wrap; word-break: break-all;
   background: #f5f5f7; border-radius: 6px; padding: 8px;
-  max-height: 240px;
+  max-height: 360px;
 }
-.preview-img { max-width: 100%; max-height: 240px; border-radius: 6px; object-fit: contain; }
+.preview-img { max-width: 100%; max-height: 400px; border-radius: 6px; object-fit: contain; }
 .bib-textarea {
   flex: 1; font-family: 'SF Mono', Monaco, monospace; font-size: 11px;
   line-height: 1.5; border: 1px solid #ddd; border-radius: 6px;
@@ -211,6 +211,7 @@ input:checked + .slider::before { transform: translateX(14px); }
       剪贴板历史
     </span>
     <div class="header-btns">
+      <button class="hbtn" id="speechBtn">组会</button>
       <button class="hbtn" id="composeBtn">多选</button>
       <button class="hbtn" id="settingsBtn">设置</button>
       <button class="hbtn" id="clearBtn">清空</button>
@@ -220,6 +221,7 @@ input:checked + .slider::before { transform: translateX(14px); }
     <div class="cont-row">
       <span class="cont-label">连续复制模式</span>
       <div style="display:flex;align-items:center;gap:8px;">
+        <button id="discardBtn" style="display:none;font-size:11px;padding:2px 10px;border-radius:5px;border:1px solid #ccc;background:#e8e8e8;color:#666;cursor:pointer;">丢弃</button>
         <button id="flushBtn" style="display:none;font-size:11px;padding:2px 10px;border-radius:5px;border:none;background:#34c759;color:#fff;cursor:pointer;">完成→存入历史</button>
         <label class="toggle"><input type="checkbox" id="contToggle"/><span class="slider"></span></label>
       </div>
@@ -264,6 +266,15 @@ input:checked + .slider::before { transform: translateX(14px); }
   <div class="setting-row">
     <span class="setting-label">最多保存图片条数</span>
     <input class="setting-input" type="number" id="maxImage" min="1" max="100" value="20"/>
+  </div>
+  <div style="border-top:1px solid #e5e5e5;margin:4px 0;padding-top:10px;">
+    <div style="font-size:12px;font-weight:600;color:#444;margin-bottom:8px;">Claude API 配置</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="setting-row">
+        <span class="setting-label" style="font-size:11px;">settings.json 路径</span>
+        <input class="setting-input" type="text" id="claudeSettingsPath" placeholder="默认 ~/.claude/settings.json" style="width:180px;text-align:left;font-size:11px;"/>
+      </div>
+    </div>
   </div>
   <div style="border-top:1px solid #e5e5e5;margin:4px 0;padding-top:10px;">
     <div style="font-size:12px;font-weight:600;color:#444;margin-bottom:8px;">Markdown 导出配置</div>
@@ -328,6 +339,7 @@ const composeInfo  = document.getElementById('composeInfo')
 const composeSep   = document.getElementById('composeSep')
 const composeDir   = document.getElementById('composeDir')
 const flushBtn          = document.getElementById('flushBtn')
+const discardBtn        = document.getElementById('discardBtn')
 const bufferPreviewBtn  = document.getElementById('bufferPreviewBtn')
 const composeCopy  = document.getElementById('composeCopy')
 const composeMd    = document.getElementById('composeMd')
@@ -390,6 +402,7 @@ function renderHistory(items) {
     const check = `<input class="select-check" type="checkbox" data-i="${i}" ${checked}/>`
 
     if (item.type === 'image') {
+      const ocrLabel = item.ocrText ? '查看识别' : 'OCR'
       return `<div class="item${selClass}" data-index="${i}">
         ${eyeBtn}${check}
         <span class="item-icon">${ICON_IMG}</span>
@@ -398,6 +411,8 @@ function renderHistory(items) {
           <div class="item-time">${time}</div>
         </div>
         <div class="item-actions">
+          <button class="action-btn ocr-btn" data-i="${i}">${ocrLabel}</button>
+          <button class="action-btn ai-recognize-btn" data-i="${i}">AI</button>
           <button class="action-btn copy-btn" data-i="${i}">复制</button>
           <button class="action-btn del-btn" data-ts="${item.ts}">✕</button>
         </div>
@@ -414,6 +429,7 @@ function renderHistory(items) {
         <div class="item-time">${time}</div>
       </div>
       <div class="item-actions">
+        <button class="action-btn ai-text-btn" data-i="${i}">AI</button>
         <button class="action-btn copy-btn" data-i="${i}">复制</button>
         ${bibBtn}
         <button class="action-btn del-btn" data-ts="${item.ts}">✕</button>
@@ -466,7 +482,15 @@ function renderHistory(items) {
     })
   })
   listEl.querySelectorAll('.eye-btn').forEach(btn => {
-    btn.addEventListener('click', e => { e.stopPropagation(); openPreview(currentHistory[parseInt(btn.dataset.i)]) })
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const item = currentHistory[parseInt(btn.dataset.i)]
+      if (item && item.type === 'image') {
+        window.api.openImageViewer({ dataUrl: item.value, ocrText: item.ocrText || '', ts: item.ts, chatHistory: item.chatHistory || [] })
+      } else {
+        openPreview(item)
+      }
+    })
   })
   listEl.querySelectorAll('.select-check').forEach(cb => {
     cb.addEventListener('change', () => { toggleSelect(parseInt(cb.dataset.i)); })
@@ -479,6 +503,30 @@ function renderHistory(items) {
   })
   listEl.querySelectorAll('.del-btn').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); window.api.deleteItem(parseInt(btn.dataset.ts)) })
+  })
+  listEl.querySelectorAll('.ocr-btn').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation()
+      const item = currentHistory[parseInt(btn.dataset.i)]
+      if (!item || item.type !== 'image') return
+      window.api.openImageViewer({ dataUrl: item.value, ocrText: item.ocrText || '', ts: item.ts, chatHistory: item.chatHistory || [] })
+    })
+  })
+  listEl.querySelectorAll('.ai-recognize-btn').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation()
+      const item = currentHistory[parseInt(btn.dataset.i)]
+      if (!item || item.type !== 'image') return
+      window.api.openImageViewer({ dataUrl: item.value, ocrText: item.ocrText || '', ts: item.ts, chatHistory: item.chatHistory || [] })
+    })
+  })
+  listEl.querySelectorAll('.ai-text-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const item = currentHistory[parseInt(btn.dataset.i)]
+      if (!item || item.type !== 'text') return
+      window.api.openTextChat({ text: item.value, ts: item.ts, chatHistory: item.chatHistory || [] })
+    })
   })
 }
 
@@ -563,7 +611,8 @@ settingsSave.addEventListener('click', () => {
   const markdownExportPath = currentExportPath
   const markdownFilename = mdFilenameInput.value.trim() || 'clipboard-history.md'
   const markdownExportMode = mdExportMode.value
-  window.api.saveSettings({ maxText, maxImage, markdownExportPath, markdownFilename, markdownExportMode })
+  const claudeSettingsPath = document.getElementById('claudeSettingsPath').value.trim()
+  window.api.saveSettings({ maxText, maxImage, markdownExportPath, markdownFilename, markdownExportMode, claudeSettingsPath })
   settingsSave.textContent = '已保存!'
   setTimeout(() => settingsSave.textContent = '保存设置', 1500)
 })
@@ -574,20 +623,142 @@ function openPreview(item) {
   modalStatus.textContent = ''
   bibTextarea.style.display = 'none'
   modalSave.style.display = 'none'
+  modalBack.style.display = 'none'
+  candidateList.style.display = 'none'
+  const aiAskBtn = document.getElementById('modalAiAsk')
+  if (aiAskBtn) aiAskBtn.style.display = 'none'
   if (item.type === 'image') {
     previewText.style.display = 'none'
     previewImg.style.display = 'block'
     previewImg.src = item.value
+    modalCopy.style.display = 'inline-block'
     modalCopy.textContent = '复制图片'
     modalCopy.onclick = () => { window.api.recopy(item); modalCopy.textContent = '已复制!'; setTimeout(() => modalCopy.textContent = '复制图片', 1500) }
+    window.api.setPreviewMode(true)
   } else {
     previewImg.style.display = 'none'
     previewText.style.display = 'block'
     previewText.textContent = item.value
+    modalCopy.style.display = 'inline-block'
     modalCopy.textContent = '复制'
     modalCopy.onclick = () => { navigator.clipboard.writeText(item.value); modalCopy.textContent = '已复制!'; setTimeout(() => modalCopy.textContent = '复制', 1500) }
   }
   modalOverlay.classList.add('show')
+}
+
+function showOcrResult(text, ts, dataUrl) {
+  modalTitle.textContent = '图片识别结果'
+  modalStatus.textContent = ''
+  bibTextarea.style.display = 'none'
+  modalSave.style.display = 'none'
+  modalBack.style.display = 'inline-block'
+  modalBack.textContent = '重新识别'
+  previewImg.style.display = 'none'
+  candidateList.style.display = 'none'
+  previewText.style.display = 'block'
+  previewText.innerHTML = `<div style="display:flex;gap:10px;height:100%;"><img src="${dataUrl}" style="max-width:45%;max-height:300px;border-radius:6px;object-fit:contain;flex-shrink:0;align-self:flex-start;"/><div style="flex:1;white-space:pre-wrap;word-break:break-word;overflow-y:auto;" id="ocrTextContent">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div></div>`
+  modalCopy.style.display = 'inline-block'
+  modalCopy.textContent = '复制'
+  modalCopy.onclick = () => { navigator.clipboard.writeText(text); modalCopy.textContent = '已复制!'; setTimeout(() => modalCopy.textContent = '复制', 1500) }
+  let aiAskBtn = document.getElementById('modalAiAsk')
+  if (!aiAskBtn) {
+    aiAskBtn = document.createElement('button')
+    aiAskBtn.id = 'modalAiAsk'
+    aiAskBtn.className = 'modal-btn primary'
+    aiAskBtn.style.background = '#7c4dff'
+    aiAskBtn.style.borderColor = '#7c4dff'
+    document.querySelector('.modal-actions').appendChild(aiAskBtn)
+  }
+  aiAskBtn.textContent = 'AI 问询'
+  aiAskBtn.style.display = 'inline-block'
+  aiAskBtn.onclick = () => showAiAskDialog(dataUrl)
+  modalBack.onclick = async () => {
+    const item = currentHistory.find(h => h.ts === ts)
+    if (!item) return
+    modalBack.style.display = 'none'
+    modalStatus.textContent = '识别中...'
+    const res = await window.api.ocrImage(item.value)
+    if (res.error) {
+      modalStatus.textContent = res.error
+      modalStatus.className = 'modal-status error'
+      modalBack.style.display = 'inline-block'
+    } else {
+      item.ocrText = res.text
+      window.api.saveOcrResult(ts, res.text)
+      const ocrContent = document.getElementById('ocrTextContent')
+      if (ocrContent) ocrContent.textContent = res.text
+      modalStatus.textContent = '已更新'
+      modalStatus.className = 'modal-status'
+      modalBack.style.display = 'inline-block'
+      modalCopy.onclick = () => { navigator.clipboard.writeText(res.text); modalCopy.textContent = '已复制!'; setTimeout(() => modalCopy.textContent = '复制', 1500) }
+    }
+  }
+  modalOverlay.classList.add('show')
+}
+
+function showAiAskDialog(dataUrl) {
+  modalTitle.textContent = 'AI 问询'
+  modalStatus.textContent = ''
+  previewImg.style.display = 'none'
+  bibTextarea.style.display = 'none'
+  modalSave.style.display = 'none'
+  candidateList.style.display = 'none'
+  const aiAskBtn = document.getElementById('modalAiAsk')
+  if (aiAskBtn) aiAskBtn.style.display = 'none'
+  previewText.style.display = 'block'
+  previewText.innerHTML = `<div style="display:flex;gap:8px;height:100%;"><img src="${dataUrl}" style="max-width:40%;max-height:200px;border-radius:6px;object-fit:contain;flex-shrink:0;align-self:flex-start;"/><div style="flex:1;display:flex;flex-direction:column;min-width:0;"><div id="aiChatHistory" style="flex:1;overflow-y:auto;margin-bottom:8px;"></div><div style="display:flex;gap:6px;"><input id="aiAskInput" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid #ddd;font-size:12px;outline:none;" placeholder="输入问题，基于图片内容回答..."/><button id="aiAskSend" style="padding:6px 12px;border-radius:6px;border:none;background:#7c4dff;color:#fff;font-size:12px;cursor:pointer;">发送</button></div></div></div>`
+  modalBack.style.display = 'inline-block'
+  modalBack.textContent = '← 返回'
+  modalBack.onclick = () => {
+    window.api.removeAiAskListeners()
+    const item = currentHistory.find(h => h.value === dataUrl)
+    if (item && item.ocrText) showOcrResult(item.ocrText, item.ts, dataUrl)
+    else modalOverlay.classList.remove('show')
+  }
+  modalCopy.style.display = 'none'
+  const sendBtn = document.getElementById('aiAskSend')
+  const input = document.getElementById('aiAskInput')
+  const chatHistory = document.getElementById('aiChatHistory')
+  const sendQuestion = () => {
+    const q = input.value.trim()
+    if (!q) return
+    chatHistory.innerHTML += `<div style="margin:4px 0;padding:4px 8px;background:#e8e8ed;border-radius:6px;font-size:12px;"><strong>你：</strong>${q.replace(/</g,'&lt;')}</div>`
+    input.value = ''
+    sendBtn.disabled = true
+    sendBtn.textContent = '停止'
+    const aiDiv = document.createElement('div')
+    aiDiv.style.cssText = 'margin:4px 0;padding:4px 8px;background:#f0eaff;border-radius:6px;font-size:12px;'
+    aiDiv.innerHTML = '<strong>AI：</strong><span class="ai-answer"></span>'
+    chatHistory.appendChild(aiDiv)
+    const answerSpan = aiDiv.querySelector('.ai-answer')
+    window.api.removeAiAskListeners()
+    window.api.onAiAskChunk(text => {
+      answerSpan.textContent += text
+      chatHistory.scrollTop = chatHistory.scrollHeight
+    })
+    window.api.onAiAskDone(() => {
+      sendBtn.disabled = false
+      sendBtn.textContent = '发送'
+      window.api.removeAiAskListeners()
+    })
+    window.api.onAiAskError(msg => {
+      answerSpan.innerHTML = `<span style="color:#ff3b30;">${msg}</span>`
+      sendBtn.disabled = false
+      sendBtn.textContent = '发送'
+      window.api.removeAiAskListeners()
+    })
+    window.api.aiAskStream(dataUrl, q)
+    sendBtn.onclick = () => {
+      window.api.aiAskAbort()
+      window.api.removeAiAskListeners()
+      sendBtn.disabled = false
+      sendBtn.textContent = '发送'
+      sendBtn.onclick = sendQuestion
+    }
+  }
+  sendBtn.onclick = sendQuestion
+  input.onkeydown = (e) => { if (e.key === 'Enter' && !sendBtn.disabled) sendQuestion() }
+  input.focus()
 }
 
 // ── BibTeX modal ──────────────────────────────────────────────────────────────
@@ -665,8 +836,8 @@ modalSave.addEventListener('click', async () => {
   if (res.ok) { modalSave.textContent = '已保存!'; setTimeout(() => modalSave.textContent = '导出 .bib', 1500) }
 })
 
-modalClose.addEventListener('click', () => modalOverlay.classList.remove('show'))
-modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.classList.remove('show') })
+modalClose.addEventListener('click', () => { modalOverlay.classList.remove('show'); window.api.setPreviewMode(false) })
+modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) { modalOverlay.classList.remove('show'); window.api.setPreviewMode(false) } })
 
 // ── Continuous mode ───────────────────────────────────────────────────────────
 let currentBuffer = ''
@@ -677,12 +848,14 @@ function updateBufferDisplay(buf) {
     contBuffer.textContent = '开启后，多次复制的文本将自动拼接'
     contBuffer.classList.add('placeholder')
     flushBtn.style.display = 'none'
+    discardBtn.style.display = 'none'
     bufferPreviewBtn.style.display = 'none'
   } else {
     contBuffer.textContent = buf
     contBuffer.classList.remove('placeholder')
     const on = contToggle.checked
     flushBtn.style.display = on ? 'inline-block' : 'none'
+    discardBtn.style.display = on ? 'inline-block' : 'none'
     bufferPreviewBtn.style.display = 'inline-block'
   }
 }
@@ -690,6 +863,12 @@ function updateBufferDisplay(buf) {
 bufferPreviewBtn.addEventListener('click', () => {
   if (!currentBuffer) return
   openPreview({ type: 'text', value: currentBuffer, ts: Date.now() })
+})
+
+discardBtn.addEventListener('click', () => {
+  window.api.discardContinuousBuffer()
+  discardBtn.textContent = '已丢弃'
+  setTimeout(() => { discardBtn.textContent = '丢弃' }, 1200)
 })
 
 flushBtn.addEventListener('click', () => {
@@ -719,29 +898,16 @@ clearBtn.addEventListener('click', () => { if (confirm('确认清空所有历史
   }
   if (settings.markdownFilename) mdFilenameInput.value = settings.markdownFilename
   if (settings.markdownExportMode) mdExportMode.value = settings.markdownExportMode
+  if (settings.claudeSettingsPath) document.getElementById('claudeSettingsPath').value = settings.claudeSettingsPath
 
-  // Draw paperclip tray icon
-  // Render Feather-style paperclip SVG onto canvas for crisp icon
-  const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`
-  const blob = new Blob([svgStr], { type: 'image/svg+xml' })
-  const svgUrl = URL.createObjectURL(blob)
-  const svgImg = new Image()
-  svgImg.onload = () => {
-    const ic = document.createElement('canvas')
-    ic.width = 18; ic.height = 18
-    const ctx = ic.getContext('2d')
-    ctx.drawImage(svgImg, 0, 0, 18, 18)
-    URL.revokeObjectURL(svgUrl)
-    window.api.setTrayIcon(ic.toDataURL('image/png'))
-  }
-  svgImg.src = svgUrl
-
-  monaIcon.src = 'tray-icon.png'
+  monaIcon.src = 'tray-butterfly.png'
 })()
 
 window.api.onHistoryUpdate(items => { renderHistory(items) })
 window.api.onContinuousBuffer(updateBufferDisplay)
 setInterval(async () => { renderHistory(await window.api.getHistory()) }, 30000)
+
+document.getElementById('speechBtn').onclick = () => window.api.openSpeechWindow()
 </script>
 </body>
 </html>

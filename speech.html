@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8"/>
+<title>组会汇报助手</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  font-size: 13px;
+  background: rgba(30,30,32,0.97);
+  color: #f2f2f7;
+  border-radius: 12px;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.titlebar {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 8px;
+  background: rgba(50,50,55,0.8);
+  flex-shrink: 0;
+}
+.titlebar-title { font-size: 13px; font-weight: 600; color: #f2f2f7; }
+.close-btn {
+  -webkit-app-region: no-drag;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #ff5f57;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 8px;
+  line-height: 12px;
+  text-align: center;
+  color: transparent;
+  font-weight: bold;
+}
+.close-btn:hover { color: rgba(0,0,0,0.6); }
+.body { display: flex; flex-direction: column; flex: 1; padding: 10px 12px 12px; gap: 8px; min-height: 0; }
+label { font-size: 11px; color: #8e8e93; margin-bottom: 4px; display: block; }
+textarea {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  background: #1c1c1e;
+  border: 1px solid #3a3a3c;
+  border-radius: 8px;
+  color: #f2f2f7;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+}
+textarea:focus { border-color: #636366; }
+.style-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.style-chip {
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid #3a3a3c;
+  background: #2c2c2e;
+  color: #aeaeb2;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-app-region: no-drag;
+}
+.style-chip:hover { border-color: #636366; color: #f2f2f7; }
+.style-chip.active { background: #1e3a5f; border-color: #4a7fc1; color: #a8c8f0; }
+.actions { display: flex; gap: 8px; flex-shrink: 0; }
+.btn {
+  flex: 1;
+  padding: 7px;
+  border-radius: 8px;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-primary { background: #2a5298; color: #c8deff; }
+.btn-primary:hover { background: #345db5; }
+.btn-primary:disabled { background: #3a3a3c; color: #8e8e93; cursor: default; }
+.btn-secondary { background: #3a3a3c; color: #f2f2f7; }
+.btn-secondary:hover { background: #48484a; }
+.status { font-size: 11px; color: #8e8e93; text-align: center; flex-shrink: 0; min-height: 16px; }
+.status.error { color: #ff453a; }
+.preview {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  background: #1c1c1e;
+  border: 1px solid #3a3a3c;
+  border-radius: 8px;
+  padding: 8px 12px;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.65;
+  color: #e5e5ea;
+  word-break: break-word;
+}
+.preview h1,.preview h2,.preview h3 { color: #f2f2f7; margin: 10px 0 4px; font-weight: 600; }
+.preview h1 { font-size: 15px; }
+.preview h2 { font-size: 13px; }
+.preview h3 { font-size: 12px; }
+.preview p { margin: 4px 0; }
+.preview ul,.preview ol { padding-left: 18px; margin: 4px 0; }
+.preview li { margin: 2px 0; }
+.preview strong { color: #f2f2f7; font-weight: 600; }
+.preview em { font-style: italic; color: #c7c7cc; }
+.preview hr { border: none; border-top: 1px solid #3a3a3c; margin: 8px 0; }
+.preview code { background: #2c2c2e; border-radius: 3px; padding: 1px 5px; font-size: 11px; font-family: monospace; }
+.pane-label { font-size: 10px; color: #636366; margin-bottom: 3px; }
+.ref-block {
+  flex-shrink: 0;
+  border: 1px solid #3a3a3c;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ref-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  cursor: pointer;
+  user-select: none;
+  background: #2c2c2e;
+  transition: background 0.15s;
+}
+.ref-header:hover { background: #363638; }
+.ref-header-left { display: flex; align-items: center; gap: 7px; }
+.ref-icon { font-size: 15px; }
+.ref-title { font-size: 12px; font-weight: 500; color: #d1d1d6; }
+.ref-badge {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #1e3a5f;
+  color: #a8c8f0;
+  border: 1px solid #4a7fc1;
+}
+.ref-arrow { font-size: 10px; color: #636366; transition: transform 0.2s; }
+.ref-arrow.open { transform: rotate(90deg); }
+.ref-body {
+  display: none;
+  padding: 8px 10px;
+  background: #1c1c1e;
+}
+.ref-body.open { display: block; }
+.ref-body textarea {
+  height: 76px;
+  border-radius: 6px;
+  border-color: #48484a;
+}
+.tab-row {
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+.tab-btn {
+  padding: 3px 12px;
+  font-size: 11px;
+  border: 1px solid #3a3a3c;
+  background: #2c2c2e;
+  color: #8e8e93;
+  cursor: pointer;
+  border-radius: 0;
+}
+.tab-btn:first-child { border-radius: 6px 0 0 6px; }
+.tab-btn:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+.tab-btn.active { background: #1e3a5f; border-color: #4a7fc1; color: #a8c8f0; }
+</style>
+</head>
+<body>
+<div class="titlebar">
+  <span class="titlebar-title">🦋 组会汇报助手</span>
+  <div style="-webkit-app-region:no-drag;display:flex;gap:6px;align-items:center;">
+    <button id="collapseBtn" style="background:none;border:none;color:#8e8e93;font-size:20px;cursor:pointer;padding:2px 8px;border-radius:4px;line-height:1;" title="收起">▾</button>
+    <button id="dupBtn" style="background:none;border:none;color:#8e8e93;cursor:pointer;padding:2px 5px;border-radius:4px;display:flex;align-items:center;" title="复制窗口"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="5" y="5" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg></button>
+    <button class="close-btn" id="closeBtn">✕</button>
+  </div>
+</div>
+<div class="body">
+  <div style="display:flex;flex-direction:column;flex:2;min-height:0;">
+    <label>汇报内容（粘贴要点/数据/结论）</label>
+    <textarea id="inputArea" placeholder="把组会要汇报的内容粘贴到这里，例如：&#10;- 本周完成了模型训练，loss 降到 0.23&#10;- 跑了 A/B 实验，CTR 提升 1.2%&#10;- 下周计划优化召回侧"></textarea>
+  </div>
+  <div style="flex-shrink:0;">
+    <label>演讲风格</label>
+    <div class="style-row" id="styleRow"></div>
+  </div>
+  <div class="ref-block">
+    <div class="ref-header" id="refToggle">
+      <div class="ref-header-left">
+        <span class="ref-icon">✦</span>
+        <span class="ref-title">参考口吻</span>
+        <span class="ref-badge" id="refHint" style="display:none;">已设置</span>
+      </div>
+      <span class="ref-arrow" id="refArrow">▶</span>
+    </div>
+    <div class="ref-body" id="refArea">
+      <textarea id="refInput" placeholder="粘贴你平常说话的原文片段，Claude 会模仿你的用词习惯和语气节奏..."></textarea>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;flex:3;min-height:0;">
+    <div class="tab-row">
+      <button class="tab-btn active" id="tabRaw">原文</button>
+      <button class="tab-btn" id="tabPreview">预览</button>
+    </div>
+    <textarea id="outputArea" placeholder="点击「生成」后显示结果..." readonly></textarea>
+    <div class="preview" id="previewPane" style="display:none;"></div>
+  </div>
+  <div class="status" id="status"></div>
+  <div class="actions">
+    <button class="btn btn-primary" id="genBtn">生成口头表达</button>
+    <button class="btn btn-secondary" id="copyBtn">复制</button>
+  </div>
+</div>
+<script>
+function renderMd(md) {
+  if (!md) return ''
+  let html = md
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^#{3} (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^#{2} (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/^---+$/gm, '<hr>')
+    .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)/g, (m) => `<ul>${m}</ul>`)
+    .replace(/<\/ul>\s*<ul>/g, '')
+    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
+    .replace(/\n\n+/g, '</p><p>')
+  html = '<p>' + html + '</p>'
+  html = html.replace(/<p>(<h[1-3]>|<ul>|<hr>)/g, '$1').replace(/(<\/h[1-3]>|<\/ul>|<hr>)<\/p>/g, '$1')
+  return html
+}
+const STYLES = [
+  {
+    id: 'default',
+    label: '默认',
+    prompt: '语言自然口语化，像平时说话一样，重点说清楚就行，长度300字左右。'
+  },
+  {
+    id: 'minimal',
+    label: '极简',
+    prompt: '语言极度精炼，每个要点一句话，去掉所有多余修饰和过渡语，直接说结论和数据，总长度不超过200字。'
+  },
+  {
+    id: 'formal',
+    label: '正式',
+    prompt: '使用正式、专业的书面语风格，结构清晰（背景→进展→问题→计划），措辞严谨，适合向高层领导汇报，长度300-400字。'
+  },
+  {
+    id: 'storytelling',
+    label: '叙事',
+    prompt: '用讲故事的方式组织内容，有起承转合，把数据和结论融入叙事线索中，让听众更容易跟上，长度400-500字。'
+  },
+  {
+    id: 'confident',
+    label: '自信',
+    prompt: '语气自信有力，多用肯定句，突出成果和价值，少提问题和困难，给听众留下"这个人掌控全局"的印象，长度300-400字。'
+  },
+  {
+    id: 'humble',
+    label: '谦逊',
+    prompt: '语气谦逊务实，如实反映进展和不足，遇到问题主动提出思考和求助，给听众留下"踏实认真"的印象，长度300-400字。'
+  },
+]
+
+let selectedStyle = 'default'
+
+const styleRow = document.getElementById('styleRow')
+STYLES.forEach(s => {
+  const chip = document.createElement('button')
+  chip.className = 'style-chip' + (s.id === selectedStyle ? ' active' : '')
+  chip.textContent = s.label
+  chip.dataset.id = s.id
+  chip.onclick = () => {
+    selectedStyle = s.id
+    styleRow.querySelectorAll('.style-chip').forEach(c => c.classList.remove('active'))
+    chip.classList.add('active')
+  }
+  styleRow.appendChild(chip)
+})
+
+const inputArea = document.getElementById('inputArea')
+const outputArea = document.getElementById('outputArea')
+const previewPane = document.getElementById('previewPane')
+const tabRaw = document.getElementById('tabRaw')
+const tabPreview = document.getElementById('tabPreview')
+let showingPreview = false
+
+function syncPreview() {
+  previewPane.innerHTML = renderMd(outputArea.value)
+  previewPane.scrollTop = previewPane.scrollHeight
+}
+
+tabRaw.onclick = () => {
+  showingPreview = false
+  tabRaw.classList.add('active'); tabPreview.classList.remove('active')
+  outputArea.style.display = ''; previewPane.style.display = 'none'
+}
+tabPreview.onclick = () => {
+  showingPreview = true
+  tabPreview.classList.add('active'); tabRaw.classList.remove('active')
+  previewPane.style.display = ''; outputArea.style.display = 'none'
+  syncPreview()
+}
+const genBtn = document.getElementById('genBtn')
+const copyBtn = document.getElementById('copyBtn')
+const status = document.getElementById('status')
+const refInput = document.getElementById('refInput')
+const refArea = document.getElementById('refArea')
+const refArrow = document.getElementById('refArrow')
+const refHint = document.getElementById('refHint')
+
+document.getElementById('refToggle').onclick = () => {
+  const open = !refArea.classList.contains('open')
+  refArea.classList.toggle('open', open)
+  refArrow.classList.toggle('open', open)
+}
+refInput.addEventListener('input', () => {
+  const has = refInput.value.trim()
+  refHint.style.display = has ? 'inline' : 'none'
+  localStorage.setItem('speechRefText', refInput.value)
+})
+
+const savedRef = localStorage.getItem('speechRefText')
+if (savedRef) {
+  refInput.value = savedRef
+  refHint.style.display = savedRef.trim() ? 'inline' : 'none'
+}
+
+// restore from duplicated window
+try {
+  const hash = location.hash.slice(1)
+  if (hash) {
+    const data = JSON.parse(decodeURIComponent(hash))
+    if (data.inputText) inputArea.value = data.inputText
+    if (data.styleId) {
+      selectedStyle = data.styleId
+      styleRow.querySelectorAll('.style-chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.id === data.styleId)
+      })
+    }
+  }
+} catch {}
+
+document.getElementById('dupBtn').onclick = () => {
+  window.speechApi.newWindow({
+    inputText: inputArea.value,
+    styleId: selectedStyle,
+  })
+}
+
+let collapsed = false
+document.getElementById('collapseBtn').onclick = () => {
+  collapsed = !collapsed
+  document.getElementById('collapseBtn').textContent = collapsed ? '▴' : '▾'
+  document.querySelector('.body').style.display = collapsed ? 'none' : 'flex'
+  window.speechApi.setCollapsed(collapsed)
+}
+
+document.getElementById('closeBtn').onclick = () => window.speechApi.close()
+
+let generating = false
+
+genBtn.onclick = async () => {
+  if (generating) {
+    window.speechApi.abort()
+    window.speechApi.removeListeners()
+    generating = false
+    genBtn.textContent = '生成口头表达'
+    genBtn.style.background = ''
+    setStatus('已停止')
+    return
+  }
+
+  const content = inputArea.value.trim()
+  if (!content) { setStatus('请先输入汇报内容', true); return }
+  const style = STYLES.find(s => s.id === selectedStyle) || STYLES[0]
+
+  generating = true
+  genBtn.textContent = '停止'
+  genBtn.style.background = '#48484a'
+  outputArea.value = ''
+  previewPane.innerHTML = ''
+  setStatus('')
+
+  window.speechApi.removeListeners()
+  window.speechApi.onChunk(text => {
+    outputArea.value += text
+    outputArea.scrollTop = outputArea.scrollHeight
+    if (showingPreview) syncPreview()
+  })
+  window.speechApi.onDone(() => {
+    generating = false
+    genBtn.textContent = '生成口头表达'
+    genBtn.style.background = ''
+    setStatus(`生成完成 · ${style.label}风格`)
+    window.speechApi.removeListeners()
+  })
+  window.speechApi.onError(msg => {
+    generating = false
+    genBtn.textContent = '生成口头表达'
+    genBtn.style.background = ''
+    setStatus(msg || '生成失败', true)
+    window.speechApi.removeListeners()
+  })
+  window.speechApi.startGenerate(content, style.prompt, refInput.value.trim())
+}
+
+copyBtn.onclick = () => {
+  if (!outputArea.value) return
+  navigator.clipboard.writeText(outputArea.value)
+  copyBtn.textContent = '已复制!'
+  setTimeout(() => copyBtn.textContent = '复制', 1500)
+}
+
+function setStatus(msg, isError = false) {
+  status.textContent = msg
+  status.className = 'status' + (isError ? ' error' : '')
+}
+</script>
+</body>
+</html>

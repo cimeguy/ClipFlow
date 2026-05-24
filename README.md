@@ -1,65 +1,96 @@
 # ClipFlow
 
-A macOS clipboard history manager that lives in your menu bar. Automatically captures every copy, lets you compose multiple clips into one, and accumulates text continuously across copies. Export to Markdown in one click. Keep your clipboard flowing, not forgetting.
+macOS 剪贴板历史管理工具，常驻菜单栏。自动记录每一次复制，支持多选拼接、连续累积模式，内置 OCR 识别、AI 图片识别与 AI 问询（基于 Claude），一键导出 Markdown。让剪贴板里的内容流动起来，而不是消失。
 
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
 ![Electron](https://img.shields.io/badge/electron-42-blue)
 
-## Download
+[English](README_en.md)
 
-**[→ Latest Release](https://github.com/cimeguy/ClipFlow/releases)**
+## 下载
 
-Download the `.dmg`, open it, and drag ClipFlow.app to your Applications folder.
+**[→ 最新版本下载](https://github.com/cimeguy/ClipFlow/releases)**
 
-## Features
+下载 `.dmg` 文件，打开后将 ClipFlow.app 拖入应用程序文件夹即可。
 
-- **Clipboard history** — automatically captures text and images as you copy
-- **Multi-select & compose** — select multiple items and join them with a custom separator
-- **Export to Markdown** — export selected items as a `.md` file, with `---` dividers between entries; images are saved as PNG files alongside
-- **BibTeX generation** — paste an arXiv URL, DOI, or paper title to auto-generate a BibTeX citation via CrossRef / arXiv API
-- **Continuous copy mode** — multiple copies accumulate into one buffer before being saved as a single history entry
-- **Drag to reorder** — drag history items to rearrange them
-- **Dark mode** — follows macOS system appearance
-- **Persistent storage** — history and settings survive restarts
+## 功能特性
 
-## Requirements
+### 剪贴板管理
+- **剪贴板历史** — 自动捕获每一次文字和图片复制，持久化保存
+- **多选拼接** — 选中多条历史，按自定义分隔符合并成一段文字，一键复制
+- **连续复制模式** — 开启后多次复制的内容自动累积为一个缓冲区，完成后存入历史
+- **导出 Markdown** — 将选中内容导出为 `.md` 文件，各条之间以 `---` 分隔；图片自动保存为 PNG 并在 Markdown 中引用
+- **BibTeX 生成** — 粘贴 arXiv 链接、DOI 或论文标题，自动通过 CrossRef / arXiv API 生成 BibTeX 引用
+- **拖拽排序** — 拖动历史条目自由调整顺序
 
-- macOS (Apple Silicon or Intel)
+### AI & 识别
+- **OCR 识别** — 基于 macOS Vision 框架的本地 OCR，支持中英文，速度快、无需联网
+- **AI 图片识别** — 调用 Claude API Vision 能力，智能理解图片内容
+- **AI 问询（图片）** — 基于图片向 AI 提问，流式输出回复，对话记录自动缓存
+- **AI 问询（文字）** — 基于复制的文本内容向 AI 提问，流式输出回复
+- **演讲稿/写作助手** — Claude 驱动的流式文本生成
+
+### 图片查看器
+- **独立查看窗口** — 大窗口（66% 宽 × 80% 高），上方图片预览 + 下方左右分栏（OCR 结果 / AI 问询）
+- **全屏图片预览** — 点击图片弹出独立全屏查看窗口
+- **剪贴板历史侧栏** — 右侧面板，可拖拽分隔栏调整宽度，悬停弹出预览气泡，点击直接复制
+- **置顶 & 最小化** — 支持窗口置顶固定和最小化
+
+### 系统集成
+- **菜单栏应用** — 常驻菜单栏，不显示在 Dock 中
+- **深色模式** — 跟随 macOS 系统外观自动切换
+- **数据持久化** — 历史记录、设置、OCR 结果、对话记录均在重启后保留
+
+## 环境要求
+
+- macOS（Apple Silicon 或 Intel）
 - Node.js 18+
 
-## Getting Started
+## 快速开始
 
 ```bash
-# Install dependencies
+# 安装依赖
 npm install
 
-# Run in development
+# 开发模式运行
 npm start
 ```
 
-## Build
+## 打包构建
 
 ```bash
-# Package for macOS (arm64)
-npx electron-packager . ClipFlow --platform=darwin --arch=arm64 --overwrite --out=dist
+# 打包为 macOS arm64 应用
+npx electron-packager . ClipFlow --platform=darwin --arch=arm64 --overwrite --out=dist \
+  --extend-info=extend-info.plist
 ```
 
-The packaged app will be in `dist/ClipFlow-darwin-arm64/`.
+打包结果在 `dist/ClipFlow-darwin-arm64/` 目录下。
 
-## Usage
+## AI 配置
 
-1. Launch the app — a paperclip icon (📎) appears in the menu bar
-2. **Click** the icon to open/close the history panel
-3. **Double-click** any item to copy it back to clipboard
-4. Click **多选** to enter multi-select mode, then pick items and click **拼接** to join and copy, or **导出 .md** to save as Markdown
-5. Click **设置** to configure history limits, Markdown export directory, and to quit the app
-6. **Right-click** the tray icon → Quit to exit
+启用 AI 功能（图片识别、AI 问询）需要配置 Claude API：
 
-## Data Storage
+1. 打开应用设置
+2. 设置 `settings.json` 路径，其中包含：
+   - `ANTHROPIC_BASE_URL` — API 端点地址
+   - `ANTHROPIC_AUTH_TOKEN` — 认证 Token
+   - `ANTHROPIC_MODEL` — 模型名称（如 `Claude-Sonnet-4.6`）
 
-History and settings are stored in:
+## 使用方法
+
+1. 启动应用 — 菜单栏出现蝴蝶图标
+2. **单击**图标打开 / 关闭历史面板
+3. **双击**任意条目将其重新复制到剪贴板
+4. 图片条目：点击眼睛图标打开图片查看器，可进行 OCR 识别和 AI 问询
+5. 文字条目：点击 AI 按钮打开文字 AI 问询窗口
+6. 点击**多选**进入多选模式，勾选条目后点击**拼接**合并复制，或点击**导出 .md** 保存为 Markdown
+7. 点击**设置**可配置历史条数上限、Markdown 导出目录、Claude API 设置，以及退出应用
+8. **右键**菜单栏图标 → 退出
+
+## 数据存储位置
+
 ```
-~/Library/Application Support/clipboardmanager/
+~/Library/Application Support/clipflow/
 ```
 
 ## License
