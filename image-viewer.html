@@ -76,8 +76,7 @@ body {
   height: 45%;
   flex-shrink: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   background: #ffffff;
   border-radius: 14px;
   padding: 16px;
@@ -85,6 +84,77 @@ body {
   position: relative;
   overflow: hidden;
 }
+.top-pane-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  position: relative;
+}
+.top-pane-text {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #555;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 8px;
+}
+.filter-bar {
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+  align-self: center;
+  background: rgba(0,0,0,0.04);
+  border-radius: 8px;
+  padding: 2px;
+}
+.filter-btn {
+  padding: 5px 16px;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 6px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+.filter-btn:hover { color: #333; background: rgba(255,255,255,0.5); }
+.filter-btn.active {
+  background: #fff;
+  color: #007aff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 0 0 0.5px rgba(0,0,0,0.04);
+  font-weight: 600;
+}
+.nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.4);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.top-pane-content:hover .nav-btn { opacity: 1; }
+.nav-btn:hover { background: rgba(0,0,0,0.6); }
+.nav-btn.prev { left: 10px; }
+.nav-btn.next { right: 10px; }
 .top-pane::before {
   content: '';
   position: absolute;
@@ -106,6 +176,31 @@ body {
 .top-pane img:hover {
   transform: scale(1.015);
   box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+.vertical-divider {
+  height: 5px;
+  cursor: ns-resize;
+  flex-shrink: 0;
+  position: relative;
+  transition: background 0.2s;
+}
+.vertical-divider:hover, .vertical-divider.active {
+  background: rgba(0,122,255,0.12);
+}
+.vertical-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(0,0,0,0.08);
+  transition: background 0.2s;
+}
+.vertical-divider:hover::after, .vertical-divider.active::after {
+  background: rgba(0,122,255,0.35);
 }
 .zoom-hint {
   position: absolute;
@@ -264,6 +359,26 @@ body {
 .chat-msg.ai table { border-collapse: collapse; margin: 6px 0; font-size: 11px; }
 .chat-msg.ai th, .chat-msg.ai td { border: 1px solid #ddd; padding: 4px 8px; }
 .chat-msg.ai th { background: #f5f5f5; }
+.chat-msg.ai { position: relative; padding-bottom: 24px; }
+.chat-msg.ai .msg-actions {
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  display: flex;
+  gap: 4px;
+}
+.chat-msg.ai .copy-msg-btn, .chat-msg.ai .export-md-btn {
+  padding: 2px 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 10px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.chat-msg.ai .copy-msg-btn:hover { border-color: #007aff; color: #007aff; }
+.chat-msg.ai .export-md-btn:hover { border-color: #34c759; color: #34c759; }
 .chat-msg.error { background: #fff0f0; color: #ff3b30; align-self: flex-start; }
 .chat-input-row {
   display: flex;
@@ -289,8 +404,39 @@ body {
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
+  position: relative;
 }
 .quick-q:hover { background: #eef0f5; border-color: #007aff; color: #007aff; }
+.quick-q .q-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1d1d1f;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 6px 10px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 420px;
+  min-width: 120px;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  pointer-events: none;
+}
+.quick-q .q-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1d1d1f;
+}
+.quick-q:hover .q-tooltip { display: block; }
 .quick-q.clear-q { border-color: #ffcdd2; color: #e53935; }
 .quick-q.clear-q:hover { background: #fff0f0; border-color: #e53935; }
 .input-resize-handle {
@@ -390,7 +536,7 @@ body {
   background: rgba(0,122,255,0.4);
 }
 .history-sidebar {
-  width: 200px;
+  width: 320px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -408,7 +554,34 @@ body {
   letter-spacing: 0.5px;
   padding: 14px 12px 8px;
   flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
+.multi-select-btn {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #666;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.multi-select-btn:hover { border-color: #007aff; color: #007aff; }
+.multi-select-btn.active { background: #007aff; border-color: #007aff; color: #fff; }
+.sidebar-item .item-check {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  flex-shrink: 0;
+  display: none;
+  accent-color: #007aff;
+}
+.sidebar-list.multi-mode .item-check { display: inline-block; }
 .sidebar-list {
   flex: 1;
   overflow-y: auto;
@@ -431,6 +604,7 @@ body {
   position: relative;
 }
 .sidebar-item:hover { background: rgba(0,0,0,0.04); }
+.sidebar-item.active { background: #d6e4ff; font-weight: 500; }
 .sidebar-item.is-image {
   height: 48px;
   display: flex;
@@ -470,9 +644,20 @@ body {
   <div class="main-layout">
     <div class="main-left">
       <div class="top-pane">
-        <img id="previewImg"/>
-        <span class="zoom-hint">点击放大</span>
+        <div class="filter-bar" id="filterBar">
+          <button class="filter-btn active" data-filter="all">全部</button>
+          <button class="filter-btn" data-filter="image">仅图片</button>
+          <button class="filter-btn" data-filter="text">仅文字</button>
+        </div>
+        <div class="top-pane-content" id="topPaneContent">
+          <button class="nav-btn prev" id="prevImg">‹</button>
+          <img id="previewImg"/>
+          <div class="top-pane-text" id="previewText" style="display:none;"></div>
+          <button class="nav-btn next" id="nextImg">›</button>
+          <span class="zoom-hint" id="zoomHint">点击放大</span>
+        </div>
       </div>
+      <div class="vertical-divider" id="verticalDivider"></div>
       <div class="bottom-pane">
         <div class="panel" id="ocrPanel">
           <div class="section-label">识别结果</div>
@@ -493,7 +678,6 @@ body {
               <span class="quick-q">翻译成英文</span>
               <span class="quick-q">总结要点</span>
               <span class="quick-q">解释含义</span>
-              <span class="quick-q">广告指标分析</span>
               <span class="quick-q clear-q">清空</span>
             </div>
             <div class="input-resize-handle" id="inputResizeHandle"></div>
@@ -507,34 +691,70 @@ body {
     </div>
     <div class="resize-handle" id="resizeHandle"></div>
     <div class="history-sidebar" id="historySidebar">
-      <div class="sidebar-header">剪贴板历史</div>
+      <div class="sidebar-header">
+        <span>剪贴板历史</span>
+        <button class="multi-select-btn" id="multiSelectBtn">多选</button>
+      </div>
       <div class="sidebar-list" id="sidebarList"></div>
     </div>
   </div>
 </div>
 <script src="node_modules/marked/lib/marked.umd.js"></script>
 <script>
+function createMsgActions(rawText) {
+  const wrap = document.createElement('div')
+  wrap.className = 'msg-actions'
+  const copyBtn = document.createElement('button')
+  copyBtn.className = 'copy-msg-btn'
+  copyBtn.textContent = '复制'
+  copyBtn.onclick = () => {
+    navigator.clipboard.writeText(rawText)
+    copyBtn.textContent = '已复制'
+    setTimeout(() => copyBtn.textContent = '复制', 1200)
+  }
+  const mdBtn = document.createElement('button')
+  mdBtn.className = 'export-md-btn'
+  mdBtn.textContent = '导出MD'
+  mdBtn.onclick = async () => {
+    const res = await window.api.exportAiMd(rawText)
+    if (res && res.ok) { mdBtn.textContent = '已导出'; setTimeout(() => mdBtn.textContent = '导出MD', 1200) }
+  }
+  wrap.appendChild(copyBtn)
+  wrap.appendChild(mdBtn)
+  return wrap
+}
+
 let imageData = ''
 let ocrText = ''
 let itemTs = null
 let chatMessages = []
+let contextText = ''
+let currentItemType = 'image'
+let currentFilter = 'all'
 
 try {
   const hash = location.hash.slice(1)
   if (hash) {
     const data = JSON.parse(decodeURIComponent(hash))
-    imageData = data.dataUrl || ''
-    ocrText = data.ocrText || ''
     itemTs = data.ts || null
     chatMessages = data.chatHistory || []
-    document.getElementById('previewImg').src = imageData
-    if (ocrText) document.getElementById('ocrResult').textContent = ocrText
+    if (data.dataUrl) {
+      imageData = data.dataUrl
+      ocrText = data.ocrText || ''
+      currentItemType = 'image'
+      document.getElementById('previewImg').src = imageData
+      if (ocrText) document.getElementById('ocrResult').textContent = ocrText
+    } else if (data.text) {
+      contextText = data.text
+      currentItemType = 'text'
+    }
     if (chatMessages.length) {
       chatMessages.forEach(msg => {
         const el = document.createElement('div')
         el.className = 'chat-msg ' + msg.role
         if (msg.role === 'ai') {
           el.innerHTML = marked.parse(msg.text)
+          el.appendChild(createMsgActions(msg.text))
         } else {
           el.textContent = msg.text
         }
@@ -555,8 +775,100 @@ document.getElementById('pinBtn').onclick = () => {
 }
 
 document.getElementById('previewImg').onclick = () => {
-  window.api.openImageFull(imageData)
+  if (currentItemType === 'image' && imageData) window.api.openImageFull(imageData)
 }
+
+// Item navigation
+let itemList = []
+let currentIdx = -1
+
+function updateTopPane() {
+  const img = document.getElementById('previewImg')
+  const textDiv = document.getElementById('previewText')
+  const zoomHint = document.getElementById('zoomHint')
+  const ocrPanel = document.getElementById('ocrPanel')
+  if (currentItemType === 'image') {
+    img.style.display = ''
+    img.src = imageData
+    textDiv.style.display = 'none'
+    zoomHint.textContent = '点击放大'
+    zoomHint.style.display = ''
+    ocrPanel.style.display = ''
+  } else {
+    img.style.display = 'none'
+    textDiv.style.display = ''
+    textDiv.textContent = contextText
+    zoomHint.style.display = 'none'
+    ocrPanel.style.display = 'none'
+  }
+}
+
+async function loadItemList() {
+  const history = await window.api.getHistory()
+  if (currentFilter === 'all') itemList = history
+  else if (currentFilter === 'image') itemList = history.filter(h => h.type === 'image')
+  else itemList = history.filter(h => h.type === 'text')
+  currentIdx = itemList.findIndex(h => h.ts === itemTs)
+  if (currentIdx === -1 && itemList.length) {
+    currentIdx = 0
+    switchToItem(0)
+  }
+}
+loadItemList()
+
+function switchToItem(idx) {
+  if (idx < 0 || idx >= itemList.length) return
+  currentIdx = idx
+  const item = itemList[idx]
+  itemTs = item.ts
+  chatMessages = item.chatHistory || []
+  if (item.type === 'image') {
+    currentItemType = 'image'
+    imageData = item.value
+    ocrText = item.ocrText || ''
+    contextText = ''
+    document.getElementById('ocrResult').textContent = ocrText || '点击下方按钮开始识别...'
+  } else {
+    currentItemType = 'text'
+    contextText = item.value
+    imageData = ''
+    ocrText = ''
+  }
+  updateTopPane()
+  const ch = document.getElementById('chatHistory')
+  ch.innerHTML = ''
+  if (chatMessages.length) {
+    chatMessages.forEach(msg => {
+      const el = document.createElement('div')
+      el.className = 'chat-msg ' + msg.role
+      if (msg.role === 'ai') {
+        el.innerHTML = marked.parse(msg.text)
+        el.appendChild(createMsgActions(msg.text))
+      } else {
+        el.textContent = msg.text
+      }
+      ch.appendChild(el)
+    })
+  }
+  highlightSidebarItem()
+}
+document.getElementById('prevImg').onclick = (e) => {
+  e.stopPropagation()
+  if (currentIdx > 0) switchToItem(currentIdx - 1)
+}
+document.getElementById('nextImg').onclick = (e) => {
+  e.stopPropagation()
+  if (currentIdx < itemList.length - 1) switchToItem(currentIdx + 1)
+}
+
+document.querySelectorAll('#filterBar .filter-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#filterBar .filter-btn').forEach(b => b.classList.remove('active'))
+    btn.classList.add('active')
+    currentFilter = btn.dataset.filter
+    loadItemList()
+  }
+})
 
 const ocrResult = document.getElementById('ocrResult')
 
@@ -603,7 +915,6 @@ function sendQuestion() {
   chatHistory.appendChild(userMsg)
   chatInput.value = ''
   chatInput.style.height = '36px'
-  chatSend.disabled = true
   chatSend.textContent = '停止'
   chatMessages.push({ role: 'user', text: q })
 
@@ -622,7 +933,7 @@ function sendQuestion() {
   window.api.onAiAskDone(() => {
     chatMessages.push({ role: 'ai', text: aiRawText })
     if (itemTs) window.api.saveChatHistory(itemTs, chatMessages)
-    chatSend.disabled = false
+    aiMsg.appendChild(createMsgActions(aiRawText))
     chatSend.textContent = '发送'
     chatSend.onclick = sendQuestion
     window.api.removeAiAskListeners()
@@ -630,16 +941,22 @@ function sendQuestion() {
   window.api.onAiAskError(msg => {
     aiMsg.className = 'chat-msg error'
     aiMsg.textContent = msg
-    chatSend.disabled = false
     chatSend.textContent = '发送'
     chatSend.onclick = sendQuestion
     window.api.removeAiAskListeners()
   })
-  window.api.aiAskStream(imageData, q)
+  if (currentItemType === 'image') {
+    window.api.aiAskStream(imageData, q + getSelectedContext())
+  } else {
+    window.api.aiTextStream(contextText, q + getSelectedContext())
+  }
   chatSend.onclick = () => {
     window.api.aiAskAbort()
     window.api.removeAiAskListeners()
-    chatSend.disabled = false
+    if (aiRawText) {
+      chatMessages.push({ role: 'ai', text: aiRawText })
+      if (itemTs) window.api.saveChatHistory(itemTs, chatMessages)
+    }
     chatSend.textContent = '发送'
     chatSend.onclick = sendQuestion
   }
@@ -656,21 +973,39 @@ chatInput.oninput = () => {
   chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + 'px'
 }
 
-const quickPrompts = {
-  '广告指标分析': '图片中LC是全量，另一个是小流量，_avg指标是队列，count是请求数，请你计算小流量相比全量的增减，计算方式_avg*count，但是小流量和全量的比例是：RTA上小流量:全量是1:5，RTB上是1:6，凡是ADXRTA_*开头的都是RTA，T开头的实验是RTB'
-}
-document.querySelectorAll('.quick-q').forEach(btn => {
-  btn.onclick = () => {
-    if (btn.classList.contains('clear-q')) {
-      chatHistory.innerHTML = ''
-      chatMessages = []
-      if (itemTs) window.api.saveChatHistory(itemTs, chatMessages)
-      return
-    }
-    chatInput.value = quickPrompts[btn.textContent] || btn.textContent
-    sendQuestion()
+const quickPrompts = {}
+
+;(async () => {
+  const settings = await window.api.getSettings()
+  const cqs = settings.customQuestions || []
+  if (cqs.length) {
+    const container = document.getElementById('quickQuestions')
+    const clearBtn = container.querySelector('.clear-q')
+    cqs.forEach(q => {
+      quickPrompts[q.name] = q.prompt || q.name
+      const btn = document.createElement('span')
+      btn.className = 'quick-q'
+      btn.textContent = q.name
+      const tip = document.createElement('span')
+      tip.className = 'q-tooltip'
+      tip.textContent = q.prompt || q.name
+      btn.appendChild(tip)
+      container.insertBefore(btn, clearBtn)
+    })
   }
-})
+  document.querySelectorAll('.quick-q').forEach(btn => {
+    btn.onclick = () => {
+      if (btn.classList.contains('clear-q')) {
+        chatHistory.innerHTML = ''
+        chatMessages = []
+        if (itemTs) window.api.saveChatHistory(itemTs, chatMessages)
+        return
+      }
+      chatInput.value = quickPrompts[btn.textContent] || btn.textContent
+      sendQuestion()
+    }
+  })
+})()
 
 ;(function() {
   const handle = document.getElementById('inputResizeHandle')
@@ -698,6 +1033,29 @@ document.querySelectorAll('.quick-q').forEach(btn => {
   })
 })()
 
+let multiSelectMode = false
+const selectedItems = new Set()
+
+document.getElementById('multiSelectBtn').onclick = () => {
+  multiSelectMode = !multiSelectMode
+  document.getElementById('multiSelectBtn').classList.toggle('active', multiSelectMode)
+  document.getElementById('sidebarList').classList.toggle('multi-mode', multiSelectMode)
+  if (!multiSelectMode) selectedItems.clear()
+}
+
+function getSelectedContext() {
+  if (!multiSelectMode || selectedItems.size === 0) return ''
+  const parts = []
+  selectedItems.forEach(item => {
+    if (item.type === 'image') {
+      parts.push('[图片' + (item.ocrText ? ': ' + item.ocrText : '') + ']')
+    } else {
+      parts.push(item.value)
+    }
+  })
+  return '\n\n---参考内容---\n' + parts.join('\n---\n')
+}
+
 async function loadSidebar() {
   const history = await window.api.getHistory()
   const list = document.getElementById('sidebarList')
@@ -705,6 +1063,16 @@ async function loadSidebar() {
   history.forEach(item => {
     const el = document.createElement('div')
     el.className = 'sidebar-item' + (item.type === 'image' ? ' is-image' : '')
+    el.dataset.ts = item.ts
+    const check = document.createElement('input')
+    check.type = 'checkbox'
+    check.className = 'item-check'
+    check.onclick = (e) => {
+      e.stopPropagation()
+      if (check.checked) selectedItems.add(item)
+      else selectedItems.delete(item)
+    }
+    el.appendChild(check)
     if (item.type === 'image') {
       const img = document.createElement('img')
       img.src = item.value
@@ -713,7 +1081,10 @@ async function loadSidebar() {
       span.textContent = item.ocrText || '图片'
       el.appendChild(span)
     } else {
-      el.textContent = item.value
+      const span = document.createElement('span')
+      span.textContent = item.value
+      span.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1'
+      el.appendChild(span)
     }
     const tip = document.createElement('span')
     tip.className = 'copied-tip'
@@ -739,6 +1110,12 @@ async function loadSidebar() {
       window.api.hidePreviewPopup()
     }
     el.onclick = () => {
+      if (multiSelectMode) {
+        check.checked = !check.checked
+        if (check.checked) selectedItems.add(item)
+        else selectedItems.delete(item)
+        return
+      }
       const copyText = item.type === 'image' ? (item.ocrText || '') : item.value
       if (!copyText) return
       navigator.clipboard.writeText(copyText)
@@ -747,9 +1124,20 @@ async function loadSidebar() {
     }
     list.appendChild(el)
   })
+  highlightSidebarItem()
 }
 loadSidebar()
 window.api.onHistoryUpdate(loadSidebar)
+
+function highlightSidebarItem() {
+  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'))
+  if (!itemTs) return
+  const target = document.querySelector(`.sidebar-item[data-ts="${itemTs}"]`)
+  if (target) {
+    target.classList.add('active')
+    target.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
+}
 
 // Resize handle
 ;(function() {
@@ -780,6 +1168,41 @@ window.api.onHistoryUpdate(loadSidebar)
   })
 })()
 
+// Vertical divider between image and bottom panels
+;(function() {
+  const divider = document.getElementById('verticalDivider')
+  const topPane = document.querySelector('.top-pane')
+  const bottomPane = document.querySelector('.bottom-pane')
+  let startY, topH, bottomH
+  divider.addEventListener('mousedown', e => {
+    e.preventDefault()
+    startY = e.clientY
+    topH = topPane.offsetHeight
+    bottomH = bottomPane.offsetHeight
+    divider.classList.add('active')
+    document.body.style.cursor = 'ns-resize'
+    document.body.style.userSelect = 'none'
+    const onMove = ev => {
+      const diff = ev.clientY - startY
+      const newTop = Math.max(80, topH + diff)
+      const newBottom = Math.max(80, bottomH - diff)
+      topPane.style.height = newTop + 'px'
+      topPane.style.flex = 'none'
+      bottomPane.style.flex = 'none'
+      bottomPane.style.height = newBottom + 'px'
+    }
+    const onUp = () => {
+      divider.classList.remove('active')
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  })
+})()
+
 // Bottom divider between OCR and AI panels
 ;(function() {
   const divider = document.getElementById('bottomDivider')
@@ -795,13 +1218,13 @@ window.api.onHistoryUpdate(loadSidebar)
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
     const onMove = ev => {
+      const total = ocrW + chatW
       const diff = ev.clientX - startX
       const newOcr = Math.max(150, ocrW + diff)
       const newChat = Math.max(150, chatW - diff)
-      ocrPanel.style.flex = 'none'
-      chatPanel.style.flex = 'none'
-      ocrPanel.style.width = newOcr + 'px'
-      chatPanel.style.width = newChat + 'px'
+      const ratio = newOcr / (newOcr + newChat)
+      ocrPanel.style.flex = ratio.toFixed(3)
+      chatPanel.style.flex = (1 - ratio).toFixed(3)
     }
     const onUp = () => {
       divider.classList.remove('active')

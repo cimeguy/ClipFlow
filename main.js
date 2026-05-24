@@ -382,6 +382,7 @@ ipcMain.on('ai-ask-stream', async (event, dataUrl, question) => {
     })
     activeAskRequests.set(id, req)
     await req
+    if (!activeAskRequests.has(id)) return
     activeAskRequests.delete(id)
     try { if (!event.sender.isDestroyed()) event.sender.send('ai-ask-done') } catch {}
   } catch (e) {
@@ -417,6 +418,7 @@ ipcMain.on('ai-text-stream', async (event, contextText, question) => {
     })
     activeAskRequests.set(id, req)
     await req
+    if (!activeAskRequests.has(id)) return
     activeAskRequests.delete(id)
     try { if (!event.sender.isDestroyed()) event.sender.send('ai-ask-done') } catch {}
   } catch (e) {
@@ -700,6 +702,29 @@ ipcMain.handle('save-compose-md', async (_, { items, mode, filename, defaultDir 
   }
 })
 
+ipcMain.handle('export-ai-md', async (_, text) => {
+  try {
+    const dir = settings.markdownExportPath
+    if (!dir) {
+      const { filePath } = await dialog.showSaveDialog(BrowserWindow.getFocusedWindow() || win, {
+        title: '导出 AI 回复为 Markdown',
+        defaultPath: 'ai-response.md',
+        filters: [{ name: 'Markdown', extensions: ['md'] }]
+      })
+      if (!filePath) return { ok: false }
+      fs.writeFileSync(filePath, text + '\n', 'utf8')
+      return { ok: true }
+    }
+    const filename = settings.markdownFilename || 'clipboard-history.md'
+    const file = path.join(dir, filename)
+    const exists = fs.existsSync(file) && fs.statSync(file).size > 0
+    fs.appendFileSync(file, (exists ? '\n\n---\n\n' : '') + text + '\n', 'utf8')
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
+
 ipcMain.handle('save-bib-file', async (_, content) => {
   const { filePath } = await dialog.showSaveDialog(win, {
     title: '导出 BibTeX',
@@ -728,9 +753,13 @@ function createWindow() {
     },
   })
   win.loadFile('index.html')
-  win.webContents.openDevTools({ mode: 'detach' })
   win.on('blur', () => {
-    if (!win.webContents.isDevToolsOpened()) win.hide()
+    if (!win.webContents.isDevToolsOpened()) {
+      setTimeout(() => {
+        const focused = BrowserWindow.getFocusedWindow()
+        if (!focused || focused === win) win.hide()
+      }, 100)
+    }
   })
 }
 
@@ -886,9 +915,10 @@ ipcMain.on('set-always-on-top', (event, flag) => {
 })
 
 ipcMain.on('open-text-chat', (_, data) => {
+  const { width: screenW, height: screenH } = require('electron').screen.getPrimaryDisplay().workAreaSize
   const chatWin = new BrowserWindow({
-    width: 680,
-    height: 520,
+    width: Math.round(screenW * 0.8),
+    height: Math.round(screenH * 0.85),
     minWidth: 500,
     minHeight: 300,
     frame: false,
@@ -948,8 +978,8 @@ ipcMain.on('open-image-viewer', (_, data) => {
   const { screen } = require('electron')
   const display = screen.getPrimaryDisplay()
   const area = display.workArea
-  const winW = Math.round(area.width * 0.66)
-  const winH = Math.round(area.height * 0.8)
+  const winW = Math.round(area.width * 0.88)
+  const winH = Math.round(area.height * 0.9)
   const viewerWin = new BrowserWindow({
     width: winW,
     height: winH,
@@ -971,8 +1001,8 @@ ipcMain.on('open-image-full', (_, dataUrl) => {
   const { screen } = require('electron')
   const display = screen.getPrimaryDisplay()
   const area = display.workArea
-  const winW = Math.round(area.width * 0.4)
-  const winH = Math.round(area.height * 0.4)
+  const winW = Math.round(area.width * 0.6)
+  const winH = Math.round(area.height * 0.65)
   const x = Math.round(area.x + (area.width - winW) / 2)
   const y = area.y + Math.round((area.height - winH) * 0.25)
   const fullWin = new BrowserWindow({

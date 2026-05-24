@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   saveOcrResult: (ts, ocrText) => ipcRenderer.send('save-ocr-result', ts, ocrText),
   saveChatHistory: (ts, messages) => ipcRenderer.send('save-chat-history', ts, messages),
+  exportAiMd: (text) => ipcRenderer.invoke('export-ai-md', text),
   setPreviewMode: (enabled) => ipcRenderer.send('set-preview-mode', enabled),
   openImageViewer: (data) => ipcRenderer.send('open-image-viewer', data),
   openImageFull: (dataUrl) => ipcRenderer.send('open-image-full', dataUrl),

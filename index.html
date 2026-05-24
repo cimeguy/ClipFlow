@@ -98,17 +98,18 @@ input:checked + .slider::before { transform: translateX(14px); }
 /* ── Compose bar ── */
 .compose-bar {
   display: none; padding: 8px 12px; border-top: 1px solid #e5e5e5;
-  gap: 6px; align-items: center; flex-shrink: 0; background: #f9f9f9;
+  gap: 6px; flex-direction: column; flex-shrink: 0; background: #f9f9f9;
 }
 .compose-bar.show { display: flex; }
-.compose-info { flex: 1; font-size: 11px; color: #666; }
+.compose-info { font-size: 11px; color: #666; }
+.compose-btns { display: flex; gap: 6px; align-items: center; }
 .compose-sep {
   font-size: 11px; padding: 3px 8px; border-radius: 5px;
   border: 1px solid #ddd; background: #fff; cursor: pointer; color: #444;
 }
 .compose-copy {
   font-size: 11px; padding: 3px 10px; border-radius: 5px;
-  border: none; background: #007aff; color: #fff; cursor: pointer;
+  border: 1px solid #ccc; background: #f5f5f7; color: #333; cursor: pointer;
 }
 .compose-copy:disabled { opacity: .4; cursor: default; }
 
@@ -118,6 +119,33 @@ input:checked + .slider::before { transform: translateX(14px); }
   border-top: 1px solid #e5e5e5; flex-shrink: 0; background: #fafafa;
 }
 .settings-panel.show { display: flex; }
+.cq-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+}
+.cq-modal {
+  background: #fff; border-radius: 12px; padding: 16px; width: 340px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15); max-height: 80vh; overflow-y: auto;
+}
+.cq-item {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+  background: #f5f5f7; border-radius: 6px; position: relative;
+}
+.cq-item-name { font-size: 11px; font-weight: 500; color: #333; }
+.cq-item-prompt { font-size: 10px; color: #999; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cq-item-del { font-size: 12px; color: #ff3b30; background: none; border: none; cursor: pointer; padding: 0 4px; flex-shrink: 0; }
+.cq-tooltip {
+  display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%); background: rgba(30,30,30,0.92); color: #f0f0f0;
+  font-size: 11px; line-height: 1.4; padding: 6px 10px; border-radius: 6px;
+  white-space: pre-wrap; word-break: break-all; max-width: 300px; width: max-content;
+  z-index: 200; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.cq-tooltip::after {
+  content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: rgba(30,30,30,0.92);
+}
+.cq-item:hover .cq-tooltip { display: block; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .setting-label { font-size: 12px; color: #555; }
 .setting-input {
@@ -243,18 +271,21 @@ input:checked + .slider::before { transform: translateX(14px); }
 <!-- Compose bar -->
 <div class="compose-bar" id="composeBar">
   <span class="compose-info" id="composeInfo">选择条目后拼接</span>
-  <select class="compose-sep" id="composeSep">
-    <option value="\n">换行</option>
-    <option value=" ">空格</option>
-    <option value="">直接拼</option>
-    <option value="\n\n">空行</option>
-  </select>
-  <select class="compose-sep" id="composeDir">
-    <option value="asc">从上↓</option>
-    <option value="desc">从下↑</option>
-  </select>
-  <button class="compose-copy" id="composeCopy" disabled>拼接</button>
-  <button class="compose-copy" id="composeMd" disabled style="background:#7c4dff;">导出 .md</button>
+  <div class="compose-btns">
+    <select class="compose-sep" id="composeSep">
+      <option value="\n">换行</option>
+      <option value=" ">空格</option>
+      <option value="">直接拼</option>
+      <option value="\n\n">空行</option>
+    </select>
+    <select class="compose-sep" id="composeDir">
+      <option value="asc">从上↓</option>
+      <option value="desc">从下↑</option>
+    </select>
+    <button class="compose-copy" id="composeCopy" disabled style="background:#5c9ad6;color:#fff;border-color:#5c9ad6;">拼接</button>
+    <button class="compose-copy" id="composeMd" disabled style="background:#9b8ec4;color:#fff;border-color:#9b8ec4;">导出 .md</button>
+    <button class="compose-copy" id="composeAi" disabled style="background:#6db56d;color:#fff;border-color:#6db56d;">AI 问询</button>
+  </div>
 </div>
 
 <!-- Settings panel -->
@@ -297,9 +328,37 @@ input:checked + .slider::before { transform: translateX(14px); }
       </div>
     </div>
   </div>
+  <div style="border-top:1px solid #e5e5e5;margin:4px 0;padding-top:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:12px;font-weight:600;color:#444;">常用问题</div>
+      <button class="hbtn" id="editCustomQBtn">设置常用问题</button>
+    </div>
+  </div>
   <div style="display:flex;justify-content:space-between;align-items:center;">
     <button id="quitBtn" style="font-size:12px;padding:4px 14px;border-radius:5px;border:1px solid #ffb3b0;background:#fff5f5;color:#ff3b30;cursor:pointer;">退出应用</button>
     <button class="settings-save" id="settingsSave">保存设置</button>
+  </div>
+</div>
+
+<!-- Custom questions modal -->
+<div class="cq-overlay" id="cqOverlay" style="display:none;">
+  <div class="cq-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:600;color:#333;">常用问题管理</div>
+      <button id="cqClose" style="background:none;border:none;font-size:16px;cursor:pointer;color:#999;padding:0 4px;">✕</button>
+    </div>
+    <div style="font-size:10px;color:#aaa;margin-bottom:8px;">添加的问题会显示在问询窗口的快捷按钮区</div>
+    <div id="customQList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;max-height:200px;overflow-y:auto;"></div>
+    <div style="display:flex;gap:4px;margin-bottom:8px;">
+      <input type="text" id="customQName" placeholder="按钮名称" style="flex:1;font-size:11px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;outline:none;"/>
+    </div>
+    <div style="display:flex;gap:4px;margin-bottom:10px;">
+      <textarea id="customQPrompt" placeholder="提示词（可选，留空则与名称相同）" rows="3" style="flex:1;font-size:11px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;resize:vertical;font-family:inherit;outline:none;"></textarea>
+    </div>
+    <div style="display:flex;gap:6px;justify-content:flex-end;">
+      <button class="hbtn" id="addCustomQ" style="background:#007aff;color:#fff;border-color:#007aff;padding:4px 12px;">添加</button>
+      <button class="hbtn" id="cqSave" style="background:#34c759;color:#fff;border-color:#34c759;padding:4px 12px;">保存</button>
+    </div>
   </div>
 </div>
 
@@ -343,6 +402,7 @@ const discardBtn        = document.getElementById('discardBtn')
 const bufferPreviewBtn  = document.getElementById('bufferPreviewBtn')
 const composeCopy  = document.getElementById('composeCopy')
 const composeMd    = document.getElementById('composeMd')
+const composeAi    = document.getElementById('composeAi')
 const settingsPanel= document.getElementById('settingsPanel')
 const settingsSave = document.getElementById('settingsSave')
 const maxTextInput = document.getElementById('maxText')
@@ -542,6 +602,7 @@ function updateComposeBar() {
   const n = selectedIndices.size
   composeCopy.disabled = n < 1
   composeMd.disabled = n < 1
+  composeAi.disabled = n < 1
   composeInfo.textContent = n ? `已选 ${n} 条，按顺序拼接` : '选择条目后拼接'
 }
 
@@ -582,6 +643,26 @@ composeMd.addEventListener('click', async () => {
   }
 })
 
+composeAi.addEventListener('click', () => {
+  let sorted = [...selectedIndices].sort((a,b) => a - b)
+  if (composeDir.value === 'desc') sorted.reverse()
+  const items = sorted.map(i => currentHistory[i]).filter(Boolean)
+  if (!items.length) return
+  if (items.length === 1 && items[0].type === 'image') {
+    const item = items[0]
+    window.api.openImageViewer({ dataUrl: item.value, ocrText: item.ocrText || '', ts: item.ts, chatHistory: item.chatHistory || [] })
+  } else {
+    const sep = composeSep.value.replace(/\\n/g, '\n')
+    const parts = items.map(item => {
+      if (item.type === 'image') return item.ocrText || '[图片]'
+      return item.value
+    })
+    const text = parts.join(sep)
+    const first = items[0]
+    window.api.openTextChat({ text, ts: first.ts, chatHistory: first.chatHistory || [] })
+  }
+})
+
 // ── Settings ──────────────────────────────────────────────────────────────────
 const mdExportMode    = document.getElementById('mdExportMode')
 const mdFilenameInput = document.getElementById('mdFilename')
@@ -614,7 +695,10 @@ settingsSave.addEventListener('click', () => {
   const claudeSettingsPath = document.getElementById('claudeSettingsPath').value.trim()
   window.api.saveSettings({ maxText, maxImage, markdownExportPath, markdownFilename, markdownExportMode, claudeSettingsPath })
   settingsSave.textContent = '已保存!'
-  setTimeout(() => settingsSave.textContent = '保存设置', 1500)
+  setTimeout(() => {
+    settingsSave.textContent = '保存设置'
+    document.getElementById('settingsPanel').classList.remove('show')
+  }, 600)
 })
 
 // ── Eye / Preview modal ───────────────────────────────────────────────────────
@@ -879,6 +963,64 @@ flushBtn.addEventListener('click', () => {
 contToggle.addEventListener('change', () => { window.api.setContinuousMode(contToggle.checked); if (!contToggle.checked) updateBufferDisplay('') })
 clearBtn.addEventListener('click', () => { if (confirm('确认清空所有历史记录？')) window.api.clearHistory() })
 
+// ── Custom questions ─────────────────────────────────────────────────────────
+let customQuestions = []
+
+function renderCustomQList() {
+  const list = document.getElementById('customQList')
+  list.innerHTML = ''
+  customQuestions.forEach((q, i) => {
+    const row = document.createElement('div')
+    row.className = 'cq-item'
+    const name = document.createElement('span')
+    name.className = 'cq-item-name'
+    name.textContent = q.name
+    const prompt = document.createElement('span')
+    prompt.className = 'cq-item-prompt'
+    prompt.textContent = q.prompt && q.prompt !== q.name ? q.prompt : ''
+    prompt.title = q.prompt || q.name
+    const del = document.createElement('button')
+    del.className = 'cq-item-del'
+    del.textContent = '×'
+    del.onclick = () => { customQuestions.splice(i, 1); renderCustomQList() }
+    const tip = document.createElement('span')
+    tip.className = 'cq-tooltip'
+    tip.textContent = q.prompt || q.name
+    row.appendChild(name)
+    row.appendChild(prompt)
+    row.appendChild(del)
+    row.appendChild(tip)
+    list.appendChild(row)
+  })
+}
+
+document.getElementById('editCustomQBtn').onclick = () => {
+  document.getElementById('cqOverlay').style.display = 'flex'
+  renderCustomQList()
+}
+document.getElementById('cqClose').onclick = () => {
+  document.getElementById('cqOverlay').style.display = 'none'
+}
+document.getElementById('cqOverlay').onclick = (e) => {
+  if (e.target === e.currentTarget) document.getElementById('cqOverlay').style.display = 'none'
+}
+document.getElementById('addCustomQ').onclick = () => {
+  const nameInput = document.getElementById('customQName')
+  const promptInput = document.getElementById('customQPrompt')
+  const name = nameInput.value.trim()
+  if (!name) return
+  const prompt = promptInput.value.trim() || name
+  customQuestions.push({ name, prompt })
+  nameInput.value = ''
+  promptInput.value = ''
+  renderCustomQList()
+}
+document.getElementById('cqSave').onclick = () => {
+  const settings = { customQuestions }
+  window.api.saveSettings(settings)
+  document.getElementById('cqOverlay').style.display = 'none'
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 ;(async () => {
   const [items, contState, settings] = await Promise.all([
@@ -899,6 +1041,7 @@ clearBtn.addEventListener('click', () => { if (confirm('确认清空所有历史
   if (settings.markdownFilename) mdFilenameInput.value = settings.markdownFilename
   if (settings.markdownExportMode) mdExportMode.value = settings.markdownExportMode
   if (settings.claudeSettingsPath) document.getElementById('claudeSettingsPath').value = settings.claudeSettingsPath
+  if (settings.customQuestions) { customQuestions = settings.customQuestions; renderCustomQList() }
 
   monaIcon.src = 'tray-butterfly.png'
 })()
