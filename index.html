@@ -652,14 +652,22 @@ composeAi.addEventListener('click', () => {
     const item = items[0]
     window.api.openImageViewer({ dataUrl: item.value, ocrText: item.ocrText || '', ts: item.ts, chatHistory: item.chatHistory || [] })
   } else {
-    const sep = composeSep.value.replace(/\\n/g, '\n')
-    const parts = items.map(item => {
-      if (item.type === 'image') return item.ocrText || '[图片]'
-      return item.value
-    })
-    const text = parts.join(sep)
-    const first = items[0]
-    window.api.openTextChat({ text, ts: first.ts, chatHistory: first.chatHistory || [] })
+    const hasImage = items.some(it => it.type === 'image')
+    if (hasImage) {
+      const mixedItems = items.map(it => ({
+        type: it.type,
+        value: it.value,
+        ts: it.ts
+      }))
+      const first = items[0]
+      window.api.openTextChat({ mixedItems, ts: first.ts, chatHistory: first.chatHistory || [] })
+    } else {
+      const sep = composeSep.value.replace(/\\n/g, '\n')
+      const parts = items.map(item => item.value)
+      const text = parts.join(sep)
+      const first = items[0]
+      window.api.openTextChat({ text, ts: first.ts, chatHistory: first.chatHistory || [] })
+    }
   }
 })
 

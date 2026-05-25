@@ -635,6 +635,8 @@ body {
 <div class="titlebar">
   <span class="titlebar-title">图片查看</span>
   <div class="titlebar-btns">
+    <button class="pin-btn" id="closeAllBtn" title="关闭所有问询窗口" style="font-size:10px;opacity:0.6;border:1px solid #ccc;border-radius:4px;padding:2px 6px;color:#e55;">关闭全部</button>
+    <button class="pin-btn" id="keepOnlyBtn" title="仅保留当前窗口" style="font-size:10px;opacity:0.6;border:1px solid #ccc;border-radius:4px;padding:2px 6px;color:#07c;">仅保留</button>
     <button class="pin-btn" id="pinBtn" title="置顶">📌</button>
     <button class="win-btn minimize" id="minimizeBtn">−</button>
     <button class="win-btn close" id="closeBtn">✕</button>
@@ -766,6 +768,8 @@ try {
 
 document.getElementById('closeBtn').onclick = () => window.close()
 document.getElementById('minimizeBtn').onclick = () => window.api.minimizeWindow()
+document.getElementById('closeAllBtn').onclick = () => window.api.closeAllAiWindows()
+document.getElementById('keepOnlyBtn').onclick = () => window.api.closeOtherAiWindows()
 
 let pinned = false
 document.getElementById('pinBtn').onclick = () => {

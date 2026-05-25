@@ -355,6 +355,23 @@ ipcMain.handle('ai-ask-image', async (_, dataUrl, question) => {
 })
 
 const activeAskRequests = new Map()
+const aiWindows = new Set()
+
+ipcMain.on('close-all-ai-windows', () => {
+  for (const w of aiWindows) {
+    if (!w.isDestroyed()) w.close()
+  }
+  aiWindows.clear()
+})
+
+ipcMain.on('close-other-ai-windows', (event) => {
+  const sender = BrowserWindow.fromWebContents(event.sender)
+  for (const w of aiWindows) {
+    if (w !== sender && !w.isDestroyed()) w.close()
+  }
+  aiWindows.clear()
+  if (sender && !sender.isDestroyed()) aiWindows.add(sender)
+})
 
 ipcMain.on('ai-ask-stream', async (event, dataUrl, question) => {
   if (event.sender.isDestroyed()) return
@@ -413,6 +430,43 @@ ipcMain.on('ai-text-stream', async (event, contextText, question) => {
         role: 'user',
         content: `以下是一段文本内容：\n\n"""\n${contextText}\n"""\n\n${question}`
       }]
+    }, text => {
+      try { if (!event.sender.isDestroyed()) event.sender.send('ai-ask-chunk', text) } catch {}
+    })
+    activeAskRequests.set(id, req)
+    await req
+    if (!activeAskRequests.has(id)) return
+    activeAskRequests.delete(id)
+    try { if (!event.sender.isDestroyed()) event.sender.send('ai-ask-done') } catch {}
+  } catch (e) {
+    activeAskRequests.delete(id)
+    try { if (!event.sender.isDestroyed()) event.sender.send('ai-ask-error', e.message) } catch {}
+  }
+})
+
+ipcMain.on('ai-mixed-stream', async (event, contentBlocks, question) => {
+  if (event.sender.isDestroyed()) return
+  const id = event.sender.id
+  if (activeAskRequests.has(id)) { activeAskRequests.get(id).abort(); activeAskRequests.delete(id) }
+  try {
+    const cfg = loadClaudeConfig()
+    if (!cfg.apiKey) throw new Error('未找到 ANTHROPIC_AUTH_TOKEN，请检查 Claude 配置路径')
+    const parts = []
+    for (const block of contentBlocks) {
+      if (block.type === 'image') {
+        const match = block.dataUrl.match(/^data:(image\/\w+);base64,(.+)$/)
+        if (match) {
+          parts.push({ type: 'image', source: { type: 'base64', media_type: match[1], data: match[2] } })
+        }
+      } else {
+        parts.push({ type: 'text', text: block.text })
+      }
+    }
+    parts.push({ type: 'text', text: question })
+    const req = claudeRequestStream(cfg, {
+      model: cfg.model,
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: parts }]
     }, text => {
       try { if (!event.sender.isDestroyed()) event.sender.send('ai-ask-chunk', text) } catch {}
     })
@@ -927,6 +981,8 @@ ipcMain.on('open-text-chat', (_, data) => {
       contextIsolation: true,
     },
   })
+  chatWin.on('closed', () => aiWindows.delete(chatWin))
+  aiWindows.add(chatWin)
   const encodedData = encodeURIComponent(JSON.stringify(data))
   chatWin.loadFile('text-chat.html', { hash: encodedData })
 })
@@ -993,6 +1049,8 @@ ipcMain.on('open-image-viewer', (_, data) => {
       contextIsolation: true,
     },
   })
+  viewerWin.on('closed', () => aiWindows.delete(viewerWin))
+  aiWindows.add(viewerWin)
   const encodedData = encodeURIComponent(JSON.stringify(data))
   viewerWin.loadFile('image-viewer.html', { hash: encodedData })
 })

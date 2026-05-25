@@ -460,6 +460,8 @@ body {
 <div class="titlebar">
   <span class="titlebar-title">AI 问询</span>
   <div class="titlebar-btns">
+    <button class="pin-btn" id="closeAllBtn" title="关闭所有问询窗口" style="font-size:10px;opacity:0.6;border:1px solid #ccc;border-radius:4px;padding:2px 6px;color:#e55;">关闭全部</button>
+    <button class="pin-btn" id="keepOnlyBtn" title="仅保留当前窗口" style="font-size:10px;opacity:0.6;border:1px solid #ccc;border-radius:4px;padding:2px 6px;color:#07c;">仅保留</button>
     <button class="pin-btn" id="pinBtn">📌</button>
     <button class="win-btn minimize" id="minimizeBtn">−</button>
     <button class="win-btn close" id="closeBtn">✕</button>
@@ -539,10 +541,27 @@ let currentIdx = -1
 let currentItemType = 'text'
 let currentFilter = 'all'
 let imageData = ''
+let mixedItems = null
 
 function updateContextDisplay() {
   const block = document.getElementById('contextBlock')
-  if (currentItemType === 'image') {
+  if (currentItemType === 'mixed' && mixedItems) {
+    block.className = 'context-block is-mixed'
+    block.innerHTML = ''
+    mixedItems.forEach(item => {
+      if (item.type === 'image') {
+        const img = document.createElement('img')
+        img.src = item.value
+        img.style.cssText = 'max-width:100%;max-height:120px;border-radius:6px;margin:4px 0;'
+        block.appendChild(img)
+      } else {
+        const p = document.createElement('p')
+        p.style.cssText = 'margin:4px 0;white-space:pre-wrap;word-break:break-word;font-size:12px;color:#555;'
+        p.textContent = item.value
+        block.appendChild(p)
+      }
+    })
+  } else if (currentItemType === 'image') {
     block.className = 'context-block'
     block.innerHTML = ''
     const img = document.createElement('img')
@@ -561,7 +580,10 @@ try {
     contextText = data.text || ''
     itemTs = data.ts || null
     chatMessages = data.chatHistory || []
-    if (data.dataUrl) {
+    if (data.mixedItems) {
+      mixedItems = data.mixedItems
+      currentItemType = 'mixed'
+    } else if (data.dataUrl) {
       imageData = data.dataUrl
       currentItemType = 'image'
     }
@@ -646,6 +668,8 @@ document.querySelectorAll('#filterBar .filter-btn').forEach(btn => {
 
 document.getElementById('closeBtn').onclick = () => window.close()
 document.getElementById('minimizeBtn').onclick = () => window.api.minimizeWindow()
+document.getElementById('closeAllBtn').onclick = () => window.api.closeAllAiWindows()
+document.getElementById('keepOnlyBtn').onclick = () => window.api.closeOtherAiWindows()
 
 let pinned = false
 document.getElementById('pinBtn').onclick = () => {
@@ -699,7 +723,13 @@ function sendQuestion() {
     chatSend.onclick = sendQuestion
     window.api.removeAiAskListeners()
   })
-  if (currentItemType === 'image') {
+  if (currentItemType === 'mixed' && mixedItems) {
+    const blocks = mixedItems.map(it => {
+      if (it.type === 'image') return { type: 'image', dataUrl: it.value }
+      return { type: 'text', text: it.value }
+    })
+    window.api.aiMixedStream(blocks, q)
+  } else if (currentItemType === 'image') {
     window.api.aiAskStream(imageData, q)
   } else {
     window.api.aiTextStream(contextText, q)
