@@ -8,7 +8,7 @@ const POLL_INTERVAL = 500
 const DATA_FILE = path.join(app.getPath('userData'), 'history.json')
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json')
 
-let settings = { maxText: 50, maxImage: 20, markdownExportPath: '', markdownFilename: 'clipboard-history.md', markdownExportMode: 'append', claudeSettingsPath: '' }
+let settings = { maxText: 50, maxImage: 20, markdownExportPath: '', markdownFilename: 'clipboard-history.md', markdownExportMode: 'append', claudeSettingsPath: '', claudeApiKey: '', claudeBaseUrl: '', claudeModel: '', aiProvider: 'claude', openaiConfigPath: '', openaiApiKey: '', openaiBaseUrl: '', openaiModel: '' }
 
 function loadSettings() {
   try {
@@ -153,15 +153,140 @@ function loadClaudeConfig() {
   const settingsPath = settings.claudeSettingsPath
     ? settings.claudeSettingsPath.replace(/^~/, require('os').homedir())
     : path.join(require('os').homedir(), '.claude', 'settings.json')
+  let fileApiKey = '', fileBaseUrl = '', fileModel = ''
   try {
     const raw = JSON.parse(fs.readFileSync(settingsPath, 'utf8'))
-    return {
-      apiKey: raw.env?.ANTHROPIC_AUTH_TOKEN || '',
-      baseUrl: raw.env?.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
-      model: raw.env?.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
-    }
+    fileApiKey = raw.env?.ANTHROPIC_AUTH_TOKEN || ''
+    fileBaseUrl = raw.env?.ANTHROPIC_BASE_URL || 'https://api.anthropic.com'
+    fileModel = raw.env?.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
   } catch (e) {
-    throw new Error(`无法读取 Claude 配置: ${e.message}`)
+    if (!settings.claudeApiKey) throw new Error(`无法读取 Claude 配置: ${e.message}`)
+  }
+  return {
+    apiKey: settings.claudeApiKey || fileApiKey,
+    baseUrl: settings.claudeBaseUrl || fileBaseUrl || 'https://api.anthropic.com',
+    model: settings.claudeModel || fileModel || 'claude-sonnet-4-6',
+  }
+}
+
+function loadOpenAIConfig() {
+  const configPath = (settings.openaiConfigPath || '~/.codex/config.toml')
+    .replace(/^~/, require('os').homedir())
+  let tomlApiKey = '', tomlBaseUrl = '', tomlModel = ''
+  try {
+    const raw = fs.readFileSync(configPath, 'utf8')
+    // parse model (top-level)
+    const modelM = raw.match(/^model\s*=\s*"([^"]+)"/m)
+    if (modelM) tomlModel = modelM[1]
+    // parse model_provider name to find base_url
+    const providerM = raw.match(/^model_provider\s*=\s*"([^"]+)"/m)
+    if (providerM) {
+      const secRe = new RegExp(`\\[model_providers\\.${providerM[1]}\\]([\\s\\S]*?)(?=\\n\\[|$)`)
+      const secM = raw.match(secRe)
+      if (secM) {
+        const urlM = secM[1].match(/base_url\s*=\s*"([^"]+)"/)
+        if (urlM) tomlBaseUrl = urlM[1]
+      }
+    }
+    // parse API key from shell_environment_policy
+    const keyM = raw.match(/OPENAI_API_KEY\s*=\s*"([^"]+)"/) ||
+                 raw.match(/ANTHROPIC_API_KEY\s*=\s*"([^"]+)"/)
+    if (keyM) tomlApiKey = keyM[1]
+  } catch {}
+  return {
+    apiKey: settings.openaiApiKey || tomlApiKey,
+    baseUrl: settings.openaiBaseUrl || tomlBaseUrl || 'https://api.openai.com',
+    model: settings.openaiModel || tomlModel || 'gpt-4o',
+  }
+}
+
+function claudeContentToOpenAI(parts) {
+  return parts.map(p => {
+    if (p.type === 'image') {
+      return { type: 'image_url', image_url: { url: `data:${p.source.media_type};base64,${p.source.data}` } }
+    }
+    return p
+  })
+}
+
+function openaiRequestStream(cfg, messages, onChunk) {
+  let activeReq = null
+  const promise = new Promise((resolve, reject) => {
+    const payload = Buffer.from(JSON.stringify({ model: cfg.model, messages, stream: true }))
+    const baseUrl = new URL(cfg.baseUrl)
+    const isHttps = baseUrl.protocol === 'https:'
+    const lib = isHttps ? https : http
+    const options = {
+      hostname: baseUrl.hostname,
+      port: baseUrl.port || (isHttps ? 443 : 80),
+      path: (baseUrl.pathname.replace(/\/$/, '').replace(/\/v1$/, '')) + '/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': payload.length,
+        'Authorization': `Bearer ${cfg.apiKey}`,
+      }
+    }
+    const req = lib.request(options, res => {
+      if (res.statusCode !== 200) {
+        let body = ''
+        res.on('data', d => body += d)
+        res.on('end', () => {
+          let msg = `API 返回 ${res.statusCode}`
+          try { msg = JSON.parse(body)?.error?.message || msg } catch {}
+          reject(new Error(msg))
+        })
+        return
+      }
+      let buf = ''
+      res.on('data', chunk => {
+        buf += chunk.toString()
+        const lines = buf.split('\n')
+        buf = lines.pop()
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') continue
+          try {
+            const evt = JSON.parse(data)
+            const text = evt.choices?.[0]?.delta?.content
+            if (text) onChunk(text)
+          } catch {}
+        }
+      })
+      res.on('end', () => resolve())
+    })
+    req.on('error', e => {
+      if (e.code === 'ECONNRESET' || e.message === 'aborted') resolve()
+      else reject(e)
+    })
+    req.setTimeout(60000, () => { req.destroy(); reject(new Error('请求超时')) })
+    req.write(payload)
+    req.end()
+    activeReq = req
+  })
+  promise.abort = () => { if (activeReq) activeReq.destroy() }
+  return promise
+}
+
+function aiStream(claudeParts, questionText, onChunk) {
+  console.log('[aiStream] provider:', settings.aiProvider)
+  if (settings.aiProvider === 'openai') {
+    const cfg = loadOpenAIConfig()
+    console.log('[aiStream] openai baseUrl:', cfg.baseUrl, 'model:', cfg.model)
+    if (!cfg.apiKey) throw new Error('未找到 OpenAI API Key，请在设置中填写')
+    const content = Array.isArray(claudeParts)
+      ? [...claudeContentToOpenAI(claudeParts), { type: 'text', text: questionText }]
+      : questionText
+    return openaiRequestStream(cfg, [{ role: 'user', content }], onChunk)
+  } else {
+    const cfg = loadClaudeConfig()
+    console.log('[aiStream] claude baseUrl:', cfg.baseUrl, 'model:', cfg.model)
+    if (!cfg.apiKey) throw new Error('未找到 ANTHROPIC_AUTH_TOKEN，请检查 Claude 配置路径')
+    const content = Array.isArray(claudeParts)
+      ? [...claudeParts, { type: 'text', text: questionText }]
+      : questionText
+    return claudeRequestStream(cfg, { model: cfg.model, max_tokens: 4096, messages: [{ role: 'user', content }] }, onChunk)
   }
 }
 
@@ -378,23 +503,10 @@ ipcMain.on('ai-ask-stream', async (event, dataUrl, question) => {
   const id = event.sender.id
   if (activeAskRequests.has(id)) { activeAskRequests.get(id).abort(); activeAskRequests.delete(id) }
   try {
-    const cfg = loadClaudeConfig()
-    if (!cfg.apiKey) throw new Error('未找到 ANTHROPIC_AUTH_TOKEN，请检查 Claude 配置路径')
     const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/)
     if (!match) throw new Error('无效的图片数据')
-    const mediaType = match[1]
-    const b64 = match[2]
-    const req = claudeRequestStream(cfg, {
-      model: cfg.model,
-      max_tokens: 4096,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } },
-          { type: 'text', text: question }
-        ]
-      }]
-    }, text => {
+    const claudeParts = [{ type: 'image', source: { type: 'base64', media_type: match[1], data: match[2] } }]
+    const req = aiStream(claudeParts, question, text => {
       try { if (!event.sender.isDestroyed()) event.sender.send('ai-ask-chunk', text) } catch {}
     })
     activeAskRequests.set(id, req)
@@ -421,16 +533,8 @@ ipcMain.on('ai-text-stream', async (event, contextText, question) => {
   const id = event.sender.id
   if (activeAskRequests.has(id)) { activeAskRequests.get(id).abort(); activeAskRequests.delete(id) }
   try {
-    const cfg = loadClaudeConfig()
-    if (!cfg.apiKey) throw new Error('未找到 ANTHROPIC_AUTH_TOKEN，请检查 Claude 配置路径')
-    const req = claudeRequestStream(cfg, {
-      model: cfg.model,
-      max_tokens: 4096,
-      messages: [{
-        role: 'user',
-        content: `以下是一段文本内容：\n\n"""\n${contextText}\n"""\n\n${question}`
-      }]
-    }, text => {
+    const prompt = `以下是一段文本内容：\n\n"""\n${contextText}\n"""\n\n${question}`
+    const req = aiStream(null, prompt, text => {
       try { if (!event.sender.isDestroyed()) event.sender.send('ai-ask-chunk', text) } catch {}
     })
     activeAskRequests.set(id, req)
@@ -449,25 +553,16 @@ ipcMain.on('ai-mixed-stream', async (event, contentBlocks, question) => {
   const id = event.sender.id
   if (activeAskRequests.has(id)) { activeAskRequests.get(id).abort(); activeAskRequests.delete(id) }
   try {
-    const cfg = loadClaudeConfig()
-    if (!cfg.apiKey) throw new Error('未找到 ANTHROPIC_AUTH_TOKEN，请检查 Claude 配置路径')
     const parts = []
     for (const block of contentBlocks) {
       if (block.type === 'image') {
         const match = block.dataUrl.match(/^data:(image\/\w+);base64,(.+)$/)
-        if (match) {
-          parts.push({ type: 'image', source: { type: 'base64', media_type: match[1], data: match[2] } })
-        }
+        if (match) parts.push({ type: 'image', source: { type: 'base64', media_type: match[1], data: match[2] } })
       } else {
         parts.push({ type: 'text', text: block.text })
       }
     }
-    parts.push({ type: 'text', text: question })
-    const req = claudeRequestStream(cfg, {
-      model: cfg.model,
-      max_tokens: 4096,
-      messages: [{ role: 'user', content: parts }]
-    }, text => {
+    const req = aiStream(parts, question, text => {
       try { if (!event.sender.isDestroyed()) event.sender.send('ai-ask-chunk', text) } catch {}
     })
     activeAskRequests.set(id, req)
@@ -835,6 +930,7 @@ ipcMain.handle('get-history', () => history)
 ipcMain.handle('get-continuous-state', () => ({ enabled: continuousMode, buffer: continuousBuffer }))
 ipcMain.handle('get-settings', () => settings)
 ipcMain.on('save-settings', (_, s) => {
+  console.log('[save-settings] received:', JSON.stringify(s))
   settings = { ...settings, ...s }
   saveSettings()
   // re-trim history with new limits

@@ -117,6 +117,7 @@ input:checked + .slider::before { transform: translateX(14px); }
 .settings-panel {
   display: none; padding: 12px 14px; flex-direction: column; gap: 12px;
   border-top: 1px solid #e5e5e5; flex-shrink: 0; background: #fafafa;
+  max-height: 70vh; overflow-y: auto;
 }
 .settings-panel.show { display: flex; }
 .cq-overlay {
@@ -299,11 +300,50 @@ input:checked + .slider::before { transform: translateX(14px); }
     <input class="setting-input" type="number" id="maxImage" min="1" max="100" value="20"/>
   </div>
   <div style="border-top:1px solid #e5e5e5;margin:4px 0;padding-top:10px;">
-    <div style="font-size:12px;font-weight:600;color:#444;margin-bottom:8px;">Claude API 配置</div>
+    <div style="font-size:12px;font-weight:600;color:#444;margin-bottom:8px;">AI 提供商</div>
     <div style="display:flex;flex-direction:column;gap:6px;">
       <div class="setting-row">
-        <span class="setting-label" style="font-size:11px;">settings.json 路径</span>
-        <input class="setting-input" type="text" id="claudeSettingsPath" placeholder="默认 ~/.claude/settings.json" style="width:180px;text-align:left;font-size:11px;"/>
+        <span class="setting-label" style="font-size:11px;">使用哪个</span>
+        <select id="aiProvider" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:5px;background:#fff;">
+          <option value="claude">Claude</option>
+          <option value="openai">OpenAI</option>
+        </select>
+      </div>
+      <div id="claudeConfig" style="display:flex;flex-direction:column;gap:6px;">
+        <div class="setting-row">
+          <span class="setting-label" style="font-size:11px;">settings.json 路径</span>
+          <input class="setting-input" type="text" id="claudeSettingsPath" placeholder="默认 ~/.claude/settings.json" style="width:180px;text-align:left;font-size:11px;"/>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label" style="font-size:11px;">API Key（覆盖）</span>
+          <input class="setting-input" type="password" id="claudeApiKey" placeholder="留空则从配置文件读取" style="width:180px;text-align:left;font-size:11px;"/>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label" style="font-size:11px;">Base URL（覆盖）</span>
+          <input class="setting-input" type="text" id="claudeBaseUrl" placeholder="留空则从配置文件读取" style="width:180px;text-align:left;font-size:11px;"/>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label" style="font-size:11px;">Model（覆盖）</span>
+          <input class="setting-input" type="text" id="claudeModel" placeholder="留空则从配置文件读取" style="width:120px;text-align:left;font-size:11px;"/>
+        </div>
+      </div>
+      <div id="openaiConfig" style="display:none;flex-direction:column;gap:6px;">
+        <div class="setting-row">
+          <span class="setting-label" style="font-size:11px;">config.toml 路径</span>
+          <input class="setting-input" type="text" id="openaiConfigPath" placeholder="默认 ~/.codex/config.toml" style="width:180px;text-align:left;font-size:11px;"/>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label" style="font-size:11px;">API Key（覆盖）</span>
+          <input class="setting-input" type="password" id="openaiApiKey" placeholder="留空则从配置文件读取" style="width:180px;text-align:left;font-size:11px;"/>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label" style="font-size:11px;">Base URL（覆盖）</span>
+          <input class="setting-input" type="text" id="openaiBaseUrl" placeholder="留空则从配置文件读取" style="width:180px;text-align:left;font-size:11px;"/>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label" style="font-size:11px;">Model（覆盖）</span>
+          <input class="setting-input" type="text" id="openaiModel" placeholder="留空则从配置文件读取" style="width:120px;text-align:left;font-size:11px;"/>
+        </div>
       </div>
     </div>
   </div>
@@ -701,7 +741,15 @@ settingsSave.addEventListener('click', () => {
   const markdownFilename = mdFilenameInput.value.trim() || 'clipboard-history.md'
   const markdownExportMode = mdExportMode.value
   const claudeSettingsPath = document.getElementById('claudeSettingsPath').value.trim()
-  window.api.saveSettings({ maxText, maxImage, markdownExportPath, markdownFilename, markdownExportMode, claudeSettingsPath })
+  const aiProvider = document.getElementById('aiProvider').value
+  const claudeApiKey = document.getElementById('claudeApiKey').value.trim()
+  const claudeBaseUrl = document.getElementById('claudeBaseUrl').value.trim()
+  const claudeModel = document.getElementById('claudeModel').value.trim()
+  const openaiConfigPath = document.getElementById('openaiConfigPath').value.trim()
+  const openaiApiKey = document.getElementById('openaiApiKey').value.trim()
+  const openaiBaseUrl = document.getElementById('openaiBaseUrl').value.trim()
+  const openaiModel = document.getElementById('openaiModel').value.trim()
+  window.api.saveSettings({ maxText, maxImage, markdownExportPath, markdownFilename, markdownExportMode, claudeSettingsPath, aiProvider, claudeApiKey, claudeBaseUrl, claudeModel, openaiConfigPath, openaiApiKey, openaiBaseUrl, openaiModel })
   settingsSave.textContent = '已保存!'
   setTimeout(() => {
     settingsSave.textContent = '保存设置'
@@ -1049,6 +1097,22 @@ document.getElementById('cqSave').onclick = () => {
   if (settings.markdownFilename) mdFilenameInput.value = settings.markdownFilename
   if (settings.markdownExportMode) mdExportMode.value = settings.markdownExportMode
   if (settings.claudeSettingsPath) document.getElementById('claudeSettingsPath').value = settings.claudeSettingsPath
+  if (settings.claudeApiKey) document.getElementById('claudeApiKey').value = settings.claudeApiKey
+  if (settings.claudeBaseUrl) document.getElementById('claudeBaseUrl').value = settings.claudeBaseUrl
+  if (settings.claudeModel) document.getElementById('claudeModel').value = settings.claudeModel
+  if (settings.aiProvider) {
+    document.getElementById('aiProvider').value = settings.aiProvider
+    document.getElementById('claudeConfig').style.display = settings.aiProvider === 'openai' ? 'none' : 'flex'
+    document.getElementById('openaiConfig').style.display = settings.aiProvider === 'openai' ? 'flex' : 'none'
+  }
+  if (settings.openaiConfigPath) document.getElementById('openaiConfigPath').value = settings.openaiConfigPath
+  if (settings.openaiApiKey) document.getElementById('openaiApiKey').value = settings.openaiApiKey
+  if (settings.openaiBaseUrl) document.getElementById('openaiBaseUrl').value = settings.openaiBaseUrl
+  if (settings.openaiModel) document.getElementById('openaiModel').value = settings.openaiModel
+  document.getElementById('aiProvider').addEventListener('change', e => {
+    document.getElementById('claudeConfig').style.display = e.target.value === 'openai' ? 'none' : 'flex'
+    document.getElementById('openaiConfig').style.display = e.target.value === 'openai' ? 'flex' : 'none'
+  })
   if (settings.customQuestions) { customQuestions = settings.customQuestions; renderCustomQList() }
 
   monaIcon.src = 'tray-butterfly.png'
