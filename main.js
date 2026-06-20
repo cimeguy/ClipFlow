@@ -1189,6 +1189,20 @@ ipcMain.on('open-image-full', (_, dataUrl) => {
   fullWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
 })
 
+ipcMain.on('open-image-native', (_, dataUrl) => {
+  try {
+    const match = dataUrl.match(/^data:image\/(\w+);base64,(.+)$/)
+    if (!match) return
+    const ext = match[1] === 'jpeg' ? 'jpg' : match[1]
+    const tmpFile = path.join(app.getPath('temp'), `clipflow-view-${Date.now()}.${ext}`)
+    fs.writeFileSync(tmpFile, Buffer.from(match[2], 'base64'))
+    const { execFile } = require('child_process')
+    execFile('qlmanage', ['-p', tmpFile], () => {
+      fs.unlink(tmpFile, () => {})
+    })
+  } catch (e) {}
+})
+
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {

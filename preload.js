@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('api', {
   setPreviewMode: (enabled) => ipcRenderer.send('set-preview-mode', enabled),
   openImageViewer: (data) => ipcRenderer.send('open-image-viewer', data),
   openImageFull: (dataUrl) => ipcRenderer.send('open-image-full', dataUrl),
+  openImageNative: (dataUrl) => ipcRenderer.send('open-image-native', dataUrl),
   openTextChat: (data) => ipcRenderer.send('open-text-chat', data),
   minimizeWindow: () => ipcRenderer.send('minimize-window'),
   closeAllAiWindows: () => ipcRenderer.send('close-all-ai-windows'),

@@ -167,11 +167,14 @@ body {
   max-height: 100%;
   border-radius: 8px;
   object-fit: contain;
-  cursor: zoom-in;
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'><g fill='none' stroke='white' stroke-width='3.5'><circle cx='10.5' cy='10.5' r='7'/><line x1='15.5' y1='15.5' x2='22.5' y2='22.5'/><line x1='10.5' y1='7.5' x2='10.5' y2='13.5'/><line x1='7.5' y1='10.5' x2='13.5' y2='10.5'/></g><g fill='none' stroke='black' stroke-width='1.8'><circle cx='10.5' cy='10.5' r='7'/><line x1='15.5' y1='15.5' x2='22.5' y2='22.5'/><line x1='10.5' y1='7.5' x2='10.5' y2='13.5'/><line x1='7.5' y1='10.5' x2='13.5' y2='10.5'/></g></svg>") 10 10, zoom-in;
   position: relative;
   z-index: 1;
   box-shadow: 0 4px 16px rgba(0,0,0,0.08);
   will-change: transform;
+}
+.top-pane img.zoom-max {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'><g fill='none' stroke='white' stroke-width='3.5'><circle cx='10.5' cy='10.5' r='7'/><line x1='15.5' y1='15.5' x2='22.5' y2='22.5'/><line x1='7.5' y1='10.5' x2='13.5' y2='10.5'/></g><g fill='none' stroke='black' stroke-width='1.8'><circle cx='10.5' cy='10.5' r='7'/><line x1='15.5' y1='15.5' x2='22.5' y2='22.5'/><line x1='7.5' y1='10.5' x2='13.5' y2='10.5'/></g></svg>") 10 10, zoom-out;
 }
 .zoom-controls {
   position: absolute;
@@ -778,6 +781,7 @@ let contextText = ''
 let currentItemType = 'image'
 let currentFilter = 'all'
 let imgZoom = 1, panX = 0, panY = 0
+let imgDragMoved = false
 
 function applyImgTransform(animate) {
   const img = document.getElementById('previewImg')
@@ -785,8 +789,8 @@ function applyImgTransform(animate) {
   img.style.transform = `translate(${panX}px, ${panY}px) scale(${imgZoom})`
   document.getElementById('zoomLevelDisplay').textContent = Math.round(imgZoom * 100) + '%'
   document.getElementById('zoomControls').classList.toggle('zoomed', imgZoom !== 1)
-  document.getElementById('topPaneContent').style.cursor = imgZoom > 1 ? 'grab' : ''
-  img.style.cursor = imgZoom > 1 ? 'inherit' : 'zoom-in'
+  document.getElementById('topPaneContent').style.cursor = ''
+  img.classList.toggle('zoom-max', imgZoom >= 4)
   document.getElementById('zoomOutBtn').disabled = imgZoom <= 0.5
   document.getElementById('zoomInBtn').disabled = imgZoom >= 4
 }
@@ -840,8 +844,18 @@ document.getElementById('pinBtn').onclick = () => {
   window.api.setAlwaysOnTop(pinned)
 }
 
-document.getElementById('previewImg').onclick = () => {
-  if (currentItemType === 'image' && imageData && imgZoom === 1) window.api.openImageFull(imageData)
+document.getElementById('previewImg').onclick = (e) => {
+  if (currentItemType !== 'image' || !imageData) return
+  if (imgDragMoved) { imgDragMoved = false; return }
+  const img = e.currentTarget
+  const w = img.clientWidth, h = img.clientHeight
+  const s0 = imgZoom
+  const s1 = imgZoom >= 4 ? 1 : Math.min(4, imgZoom + 1)
+  if (s1 === 1) { resetZoom(); return }
+  panX += (e.offsetX - w / 2) * (s0 - s1)
+  panY += (e.offsetY - h / 2) * (s0 - s1)
+  imgZoom = s1
+  applyImgTransform()
 }
 
 // Item navigation
@@ -1290,6 +1304,7 @@ document.getElementById('previewImg').addEventListener('dblclick', (e) => {
 
 document.getElementById('topPaneContent').addEventListener('wheel', (e) => {
   if (currentItemType !== 'image') return
+  if (e.target.id !== 'previewImg') return
   e.preventDefault()
   if (e.ctrlKey) {
     // trackpad pinch — deltaY is typically -3..+3 per frame, multiply for smoothness
@@ -1339,6 +1354,7 @@ document.getElementById('topPaneContent').addEventListener('wheel', (e) => {
   })
   document.addEventListener('mousemove', (e) => {
     if (!dragging) return
+    imgDragMoved = true
     panX = startPanX + (e.clientX - startX)
     panY = startPanY + (e.clientY - startY)
     const img = document.getElementById('previewImg')
@@ -1348,7 +1364,7 @@ document.getElementById('topPaneContent').addEventListener('wheel', (e) => {
   document.addEventListener('mouseup', () => {
     if (!dragging) return
     dragging = false
-    content.style.cursor = imgZoom > 1 ? 'grab' : ''
+    content.style.cursor = ''
     document.getElementById('previewImg').style.transition = 'transform 0.15s ease'
   })
 })()
