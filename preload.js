@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('api', {
   hidePreviewPopup: () => ipcRenderer.send('hide-preview-popup'),
   onHistoryUpdate: (cb) => ipcRenderer.on('history-update', (_, data) => cb(data)),
   onContinuousBuffer: (cb) => ipcRenderer.on('continuous-buffer', (_, data) => cb(data)),
+  onPinchZoom: (cb) => ipcRenderer.on('pinch-zoom', (_, dir) => cb(dir)),
 })
 
 contextBridge.exposeInMainWorld('speechApi', {

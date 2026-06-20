@@ -1143,10 +1143,15 @@ ipcMain.on('open-image-viewer', (_, data) => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
+      zoomFactor: 1.0,
     },
   })
   viewerWin.on('closed', () => aiWindows.delete(viewerWin))
   aiWindows.add(viewerWin)
+  viewerWin.webContents.on('zoom-changed', (e, dir) => {
+    e.preventDefault()
+    viewerWin.webContents.send('pinch-zoom', dir)
+  })
   const encodedData = encodeURIComponent(JSON.stringify(data))
   viewerWin.loadFile('image-viewer.html', { hash: encodedData })
 })

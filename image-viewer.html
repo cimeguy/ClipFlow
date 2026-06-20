@@ -170,12 +170,52 @@ body {
   cursor: zoom-in;
   position: relative;
   z-index: 1;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  will-change: transform;
 }
-.top-pane img:hover {
-  transform: scale(1.015);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+.zoom-controls {
+  position: absolute;
+  bottom: 10px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.2s;
+  background: rgba(0,0,0,0.52);
+  border-radius: 20px;
+  padding: 3px 8px;
+  -webkit-app-region: no-drag;
+}
+.top-pane:hover .zoom-controls { opacity: 1; }
+.zoom-controls.zoomed { opacity: 1; }
+.zoom-ctl-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 17px;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.15s;
+  font-weight: bold;
+  padding: 0;
+  line-height: 1;
+}
+.zoom-ctl-btn:hover { background: rgba(255,255,255,0.22); }
+.zoom-ctl-btn:disabled { opacity: 0.3; cursor: default; }
+.zoom-ctl-level {
+  color: #fff;
+  font-size: 10px;
+  min-width: 34px;
+  text-align: center;
+  cursor: default;
+  user-select: none;
 }
 .vertical-divider {
   height: 5px;
@@ -656,7 +696,11 @@ body {
           <img id="previewImg"/>
           <div class="top-pane-text" id="previewText" style="display:none;"></div>
           <button class="nav-btn next" id="nextImg">›</button>
-          <span class="zoom-hint" id="zoomHint">点击放大</span>
+          <div class="zoom-controls" id="zoomControls">
+            <button class="zoom-ctl-btn" id="zoomOutBtn" title="缩小 (−)">−</button>
+            <span class="zoom-ctl-level" id="zoomLevelDisplay">100%</span>
+            <button class="zoom-ctl-btn" id="zoomInBtn" title="放大 (+)">+</button>
+          </div>
         </div>
       </div>
       <div class="vertical-divider" id="verticalDivider"></div>
@@ -733,6 +777,24 @@ let chatMessages = []
 let contextText = ''
 let currentItemType = 'image'
 let currentFilter = 'all'
+let imgZoom = 1, panX = 0, panY = 0
+
+function applyImgTransform(animate) {
+  const img = document.getElementById('previewImg')
+  img.style.transition = animate !== false ? 'transform 0.15s ease' : 'none'
+  img.style.transform = `translate(${panX}px, ${panY}px) scale(${imgZoom})`
+  document.getElementById('zoomLevelDisplay').textContent = Math.round(imgZoom * 100) + '%'
+  document.getElementById('zoomControls').classList.toggle('zoomed', imgZoom !== 1)
+  document.getElementById('topPaneContent').style.cursor = imgZoom > 1 ? 'grab' : ''
+  img.style.cursor = imgZoom > 1 ? 'inherit' : 'zoom-in'
+  document.getElementById('zoomOutBtn').disabled = imgZoom <= 0.5
+  document.getElementById('zoomInBtn').disabled = imgZoom >= 4
+}
+
+function resetZoom() {
+  imgZoom = 1; panX = 0; panY = 0
+  applyImgTransform(false)
+}
 
 try {
   const hash = location.hash.slice(1)
@@ -779,7 +841,7 @@ document.getElementById('pinBtn').onclick = () => {
 }
 
 document.getElementById('previewImg').onclick = () => {
-  if (currentItemType === 'image' && imageData) window.api.openImageFull(imageData)
+  if (currentItemType === 'image' && imageData && imgZoom === 1) window.api.openImageFull(imageData)
 }
 
 // Item navigation
@@ -789,20 +851,20 @@ let currentIdx = -1
 function updateTopPane() {
   const img = document.getElementById('previewImg')
   const textDiv = document.getElementById('previewText')
-  const zoomHint = document.getElementById('zoomHint')
+  const zoomCtrl = document.getElementById('zoomControls')
   const ocrPanel = document.getElementById('ocrPanel')
+  resetZoom()
   if (currentItemType === 'image') {
     img.style.display = ''
     img.src = imageData
     textDiv.style.display = 'none'
-    zoomHint.textContent = '点击放大'
-    zoomHint.style.display = ''
+    zoomCtrl.style.display = 'flex'
     ocrPanel.style.display = ''
   } else {
     img.style.display = 'none'
     textDiv.style.display = ''
     textDiv.textContent = contextText
-    zoomHint.style.display = 'none'
+    zoomCtrl.style.display = 'none'
     ocrPanel.style.display = 'none'
   }
 }
@@ -1206,6 +1268,102 @@ function highlightSidebarItem() {
     document.addEventListener('mouseup', onUp)
   })
 })()
+
+document.getElementById('zoomInBtn').onclick = (e) => {
+  e.stopPropagation()
+  if (currentItemType !== 'image') return
+  imgZoom = Math.min(4, parseFloat((imgZoom + 0.25).toFixed(2)))
+  applyImgTransform()
+}
+document.getElementById('zoomOutBtn').onclick = (e) => {
+  e.stopPropagation()
+  if (currentItemType !== 'image') return
+  imgZoom = Math.max(0.5, parseFloat((imgZoom - 0.25).toFixed(2)))
+  if (imgZoom === 1) { panX = 0; panY = 0 }
+  applyImgTransform()
+}
+
+document.getElementById('previewImg').addEventListener('dblclick', (e) => {
+  e.stopPropagation()
+  resetZoom()
+})
+
+document.getElementById('topPaneContent').addEventListener('wheel', (e) => {
+  if (currentItemType !== 'image') return
+  e.preventDefault()
+  if (e.ctrlKey) {
+    // trackpad pinch — deltaY is typically -3..+3 per frame, multiply for smoothness
+    const factor = 1 - e.deltaY * 0.02
+    imgZoom = Math.min(4, Math.max(0.5, parseFloat((imgZoom * factor).toFixed(3))))
+    if (imgZoom <= 1.01 && imgZoom >= 0.99) { imgZoom = 1; panX = 0; panY = 0 }
+    applyImgTransform(false)
+  } else {
+    const delta = e.deltaY < 0 ? 0.25 : -0.25
+    imgZoom = Math.min(4, Math.max(0.5, parseFloat((imgZoom + delta).toFixed(2))))
+    if (imgZoom === 1) { panX = 0; panY = 0 }
+    applyImgTransform()
+  }
+}, { passive: false })
+
+;(function() {
+  const content = document.getElementById('topPaneContent')
+  let gestureStartZoom = 1
+  content.addEventListener('gesturestart', (e) => {
+    e.preventDefault()
+    gestureStartZoom = imgZoom
+  }, { passive: false })
+  content.addEventListener('gesturechange', (e) => {
+    e.preventDefault()
+    if (currentItemType !== 'image') return
+    imgZoom = Math.min(4, Math.max(0.5, parseFloat((gestureStartZoom * e.scale).toFixed(3))))
+    if (imgZoom === 1) { panX = 0; panY = 0 }
+    applyImgTransform(false)
+  }, { passive: false })
+  content.addEventListener('gestureend', (e) => {
+    e.preventDefault()
+    applyImgTransform()
+  }, { passive: false })
+})()
+
+;(function() {
+  const content = document.getElementById('topPaneContent')
+  let dragging = false, startX, startY, startPanX, startPanY
+  content.addEventListener('mousedown', (e) => {
+    if (imgZoom <= 1 || currentItemType !== 'image') return
+    if (e.target.closest('.zoom-controls') || e.target.closest('.nav-btn')) return
+    dragging = true
+    startX = e.clientX; startY = e.clientY
+    startPanX = panX; startPanY = panY
+    content.style.cursor = 'grabbing'
+    e.preventDefault()
+  })
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return
+    panX = startPanX + (e.clientX - startX)
+    panY = startPanY + (e.clientY - startY)
+    const img = document.getElementById('previewImg')
+    img.style.transition = 'none'
+    img.style.transform = `translate(${panX}px, ${panY}px) scale(${imgZoom})`
+  })
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return
+    dragging = false
+    content.style.cursor = imgZoom > 1 ? 'grab' : ''
+    document.getElementById('previewImg').style.transition = 'transform 0.15s ease'
+  })
+})()
+
+let pinchRafPending = false
+window.api.onPinchZoom((dir) => {
+  if (currentItemType !== 'image') return
+  const factor = dir === 'in' ? 1.1 : 0.91
+  imgZoom = Math.min(4, Math.max(0.5, parseFloat((imgZoom * factor).toFixed(3))))
+  if (imgZoom <= 1.02 && imgZoom >= 0.98) { imgZoom = 1; panX = 0; panY = 0 }
+  if (!pinchRafPending) {
+    pinchRafPending = true
+    requestAnimationFrame(() => { applyImgTransform(false); pinchRafPending = false })
+  }
+})
 
 // Bottom divider between OCR and AI panels
 ;(function() {
