@@ -30,7 +30,9 @@ Download the `.dmg`, open it, and drag ClipFlow.app to your Applications folder.
 
 ### Image Viewer
 - **Dedicated viewer window** — large window (66% width × 80% height) with image preview, OCR results, and AI chat
-- **Full-screen image preview** — click image to open in a separate full-view window
+- **Image zoom** — magnifier cursor, click to zoom into the clicked point, plus wheel/trackpad-pinch zoom and double-click reset
+- **Drag to pan** — hold and drag to explore image detail when zoomed in
+- **Native quick preview** — click an image thumbnail in the clipboard history to open it in macOS Quick Look
 - **Clipboard history sidebar** — right-side panel with resizable splitter, hover preview popup, click to copy
 - **Pin & minimize** — always-on-top toggle and minimize support
 
